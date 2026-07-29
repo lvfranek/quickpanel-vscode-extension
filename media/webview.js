@@ -827,12 +827,23 @@
         if (step.type === 'file') {
           var ok = await showConfirm('Create File', 'Create "' + step.filename + '" in the current workspace folder?');
           if (ok) {
-            vscode.postMessage({ command: 'runProjectStep', stepType: 'file', filename: step.filename, content: step.content });
+            vscode.postMessage({
+              command: 'runProjectStep',
+              stepType: 'file',
+              label: step.label,
+              filename: step.filename,
+              content: step.content
+            });
           }
         } else {
           var ok2 = await showConfirm('Run Command', step.command);
           if (ok2) {
-            vscode.postMessage({ command: 'runProjectStep', stepType: 'command', commandText: step.command });
+            vscode.postMessage({
+              command: 'runProjectStep',
+              stepType: 'command',
+              label: step.label,
+              commandText: step.command
+            });
           }
         }
       };
@@ -848,16 +859,31 @@
         var stepLabels = p.steps.map(function (s, i) { return (i + 1) + '. ' + s.label; }).join('\n');
         var ok = await showConfirm(
           'Run All Steps — ' + p.name,
-          'This will run all ' + p.steps.length + ' steps in order:\n\n' + stepLabels
+          'This will run all ' + p.steps.length + ' steps in order (commands finish before later file steps):\n\n' + stepLabels
         );
         if (!ok) { return; }
 
-        p.steps.forEach(function (step) {
+        // Single message so the extension can run steps in order (scaffold
+        // commands finish before later file steps create .env / AGENTS.md / etc.).
+        var steps = p.steps.map(function (step) {
           if (step.type === 'file') {
-            vscode.postMessage({ command: 'runProjectStep', stepType: 'file', filename: step.filename, content: step.content });
-          } else {
-            vscode.postMessage({ command: 'runProjectStep', stepType: 'command', commandText: step.command });
+            return {
+              stepType: 'file',
+              label: step.label,
+              filename: step.filename,
+              content: step.content
+            };
           }
+          return {
+            stepType: 'command',
+            label: step.label,
+            commandText: step.command
+          };
+        });
+        vscode.postMessage({
+          command: 'runAllProjectSteps',
+          processName: p.name,
+          steps: steps
         });
       };
     });

@@ -15,8 +15,10 @@
   "categories": [
     "Other"
   ],
-  "icon": "icon.png",
-  "activationEvents": [],
+  "icon": "media/icon.png",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [

@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 interface Shortcut {
 	id: string;
@@ -94,8 +97,11 @@ export function activate(context: vscode.ExtensionContext) {
 					if (message.stepType === 'file') {
 						await createFile(message.filename, message.content);
 					} else {
-						await runInTerminal(message.commandText);
+						await runInTerminal(message.commandText, undefined, message.label);
 					}
+					break;
+				case "runAllProjectSteps":
+					await runAllProjectSteps(message.steps ?? [], message.processName);
 					break;
 			}
 		});
@@ -241,7 +247,7 @@ function getDefaultFiles(): FileTemplate[] {
 	return [
 		{ id: "1", name: ".env", filename: ".env", content: DEFAULT_ENV_CONTENT },
 		{ id: "2", name: ".gitignore", filename: ".gitignore", content: DEFAULT_GITIGNORE },
-		{ id: "3", name: "Agents.md", filename: "Agents.md", content: DEFAULT_AGENTS_MD },
+		{ id: "3", name: "AGENTS.md", filename: "AGENTS.md", content: DEFAULT_AGENTS_MD },
 		{ id: "4", name: "README.md", filename: "README.md", content: "# Project\n" }
 	];
 }
@@ -249,10 +255,16 @@ function getDefaultFiles(): FileTemplate[] {
 function getDefaultProjects(): ProjectType[] {
 	return [
 		// ── Processes ──
+		// Scaffolders (Next / Vite / Angular) must run in a mostly empty folder.
+		// File steps that add .env / AGENTS.md always come AFTER the scaffold command
+		// so Run All can wait for the scaffold before writing follow-up files.
+		//
+		// AGENTS.md (repo root) = passive project-wide agent rules.
+		// Skills (npx skills add) install into .agents/skills/<name>/SKILL.md — separate system.
 		{
 			id: "proj1",
 			name: "Create Next.js App",
-			description: "Scaffold a Next.js app with TypeScript, Tailwind, ESLint and App Router",
+			description: "Scaffold a Next.js app (empty folder required), then add .env and root AGENTS.md project rules",
 			steps: [
 				{
 					id: "p1s1",
@@ -262,16 +274,16 @@ function getDefaultProjects(): ProjectType[] {
 				},
 				{
 					id: "p1s2",
-					label: "Add a .env file with NODE_ENV set to development",
+					label: "Add a .env file with NODE_ENV set to development (after scaffold finishes)",
 					type: "file",
 					filename: ".env",
 					content: DEFAULT_ENV_CONTENT
 				},
 				{
 					id: "p1s3",
-					label: "Add Agents.md with critical agent rules for this project",
+					label: "Add AGENTS.md at repo root with project-wide agent rules (not a skill; after scaffold finishes)",
 					type: "file",
-					filename: "Agents.md",
+					filename: "AGENTS.md",
 					content: DEFAULT_AGENTS_MD
 				}
 			]
@@ -279,7 +291,7 @@ function getDefaultProjects(): ProjectType[] {
 		{
 			id: "proj2",
 			name: "Create React (Vite) App",
-			description: "Scaffold a React + TypeScript app with Vite",
+			description: "Scaffold a React + TypeScript Vite app (empty folder required), install deps, add .env",
 			steps: [
 				{
 					id: "p2s1",
@@ -295,7 +307,7 @@ function getDefaultProjects(): ProjectType[] {
 				},
 				{
 					id: "p2s3",
-					label: "Add a .env file with VITE_APP_NAME for client-side config",
+					label: "Add a .env file with VITE_APP_NAME for client-side config (after scaffold finishes)",
 					type: "file",
 					filename: ".env",
 					content: "VITE_APP_NAME=my-app\n"
@@ -305,7 +317,7 @@ function getDefaultProjects(): ProjectType[] {
 		{
 			id: "proj3",
 			name: "Create Simple HTML + CSS + JS",
-			description: "Three-file static site: HTML, CSS reset and a starter script",
+			description: "Three-file static site: HTML, CSS reset and a starter script (safe in any folder)",
 			steps: [
 				{
 					id: "p3s1",
@@ -333,23 +345,17 @@ function getDefaultProjects(): ProjectType[] {
 		{
 			id: "proj4",
 			name: "Create Angular App",
-			description: "Scaffold an Angular app with routing and SCSS",
+			description: "Scaffold an Angular app via npx (empty folder required), then add .env",
 			steps: [
 				{
 					id: "p4s1",
-					label: "Install the Angular CLI globally",
+					label: "Create a new Angular project in the current folder with routing and SCSS (no global CLI install)",
 					type: "command",
-					command: "npm install -g @angular/cli"
+					command: "npx -y @angular/cli@latest new . --routing --style=scss --skip-git --defaults --ssr=false"
 				},
 				{
 					id: "p4s2",
-					label: "Create a new Angular project in the current folder with routing and SCSS",
-					type: "command",
-					command: "ng new . --routing --style=scss --skip-git --defaults"
-				},
-				{
-					id: "p4s3",
-					label: "Add a .env file with NODE_ENV set to development",
+					label: "Add a .env file with NODE_ENV set to development (after scaffold finishes)",
 					type: "file",
 					filename: ".env",
 					content: DEFAULT_ENV_CONTENT
@@ -359,7 +365,7 @@ function getDefaultProjects(): ProjectType[] {
 		{
 			id: "proj5",
 			name: "Add Tailwind CSS",
-			description: "Install Tailwind CSS v4 with the official Vite plugin (works for Vite; Next.js can use the same CSS import)",
+			description: "Install Tailwind CSS v4 + Vite plugin, then write src/index.css import (run inside an existing app)",
 			steps: [
 				{
 					id: "p5s1",
@@ -369,7 +375,7 @@ function getDefaultProjects(): ProjectType[] {
 				},
 				{
 					id: "p5s2",
-					label: "Add the Tailwind CSS import to your main stylesheet (also register tailwindcss() in vite.config plugins)",
+					label: "Add the Tailwind CSS import to src/index.css (also register tailwindcss() in vite.config plugins)",
 					type: "file",
 					filename: "src/index.css",
 					content: '@import "tailwindcss";\n'
@@ -379,7 +385,7 @@ function getDefaultProjects(): ProjectType[] {
 		{
 			id: "proj6",
 			name: "Create Clean Empty Project",
-			description: "Minimal starter: gitignore, env, README and Agents.md",
+			description: "Minimal starter files only (no scaffolder): gitignore, env, README and root AGENTS.md",
 			steps: [
 				{
 					id: "p6s1",
@@ -404,44 +410,59 @@ function getDefaultProjects(): ProjectType[] {
 				},
 				{
 					id: "p6s4",
-					label: "Add Agents.md with critical agent rules for this project",
+					label: "Add AGENTS.md at repo root with project-wide agent rules (not a skill package)",
 					type: "file",
-					filename: "Agents.md",
+					filename: "AGENTS.md",
 					content: DEFAULT_AGENTS_MD
 				}
 			]
 		},
-		// ── Skills ──
+		// ── Skills (install into .agents/skills/<name>/SKILL.md — separate from root AGENTS.md) ──
 		{
 			id: "skill1",
 			name: "Add React/Next.js Best Practices Skill",
-			description: "Install the Vercel React/Next.js best-practices agent skill",
+			description: "Installs into .agents/skills/… (SKILL.md). Separate from root AGENTS.md project rules.",
 			steps: [
 				{
 					id: "sk1s1",
-					label: "Install the vercel-react-best-practices skill via the skills CLI",
+					label: "Install vercel-react-best-practices into .agents/skills via the skills CLI",
 					type: "command",
-					command: "npx skills add vercel-labs/agent-skills --skill vercel-react-best-practices"
+					command: "npx -y skills add vercel-labs/agent-skills --skill vercel-react-best-practices"
 				}
 			]
 		},
 		{
 			id: "skill2",
 			name: "Add Supabase Postgres Best Practices Skill",
-			description: "Install the Supabase Postgres best-practices agent skill",
+			description: "Installs into .agents/skills/… (SKILL.md). Separate from root AGENTS.md project rules.",
 			steps: [
 				{
 					id: "sk2s1",
-					label: "Install the supabase-postgres-best-practices skill via the skills CLI",
+					label: "Install supabase-postgres-best-practices into .agents/skills via the skills CLI",
 					type: "command",
-					command: "npx skills add supabase/agent-skills --skill supabase-postgres-best-practices"
+					command: "npx -y skills add supabase/agent-skills --skill supabase-postgres-best-practices"
 				}
 			]
 		}
 	];
 }
 
-async function createFile(filename: string, content: string) {
+interface ProjectStepPayload {
+	stepType: 'file' | 'command';
+	label?: string;
+	filename?: string;
+	content?: string;
+	commandText?: string;
+}
+
+interface CreateFileOptions {
+	/** Skip the overwrite confirmation dialog */
+	force?: boolean;
+	/** Do not open the file in the editor after writing */
+	skipOpen?: boolean;
+}
+
+async function createFile(filename: string, content: string, options: CreateFileOptions = {}) {
 	const folders = vscode.workspace.workspaceFolders;
 	if (!folders) {
 		vscode.window.showErrorMessage("Open a folder first");
@@ -453,29 +474,157 @@ async function createFile(filename: string, content: string) {
 	try {
 		try {
 			await vscode.workspace.fs.stat(fileUri);
-			const choice = await vscode.window.showWarningMessage(
-				`${filename} already exists. Overwrite?`,
-				"Yes",
-				"No"
-			);
-			if (choice !== "Yes") { return; }
+			if (!options.force) {
+				const choice = await vscode.window.showWarningMessage(
+					`${filename} already exists. Overwrite?`,
+					"Yes",
+					"No"
+				);
+				if (choice !== "Yes") { return; }
+			}
 		} catch {
 			// file does not exist — proceed
 		}
 
+		// Ensure parent directories exist (e.g. src/index.css)
+		const parentSegments = filename.split(/[/\\]/).filter(Boolean).slice(0, -1);
+		if (parentSegments.length > 0) {
+			try {
+				await vscode.workspace.fs.createDirectory(
+					vscode.Uri.joinPath(folders[0].uri, ...parentSegments)
+				);
+			} catch {
+				// already exists or not needed
+			}
+		}
+
 		await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content, "utf8"));
 		vscode.window.showInformationMessage(`Created ${filename}`);
-		const doc = await vscode.workspace.openTextDocument(fileUri);
-		await vscode.window.showTextDocument(doc, { preview: false });
+		if (!options.skipOpen) {
+			const doc = await vscode.workspace.openTextDocument(fileUri);
+			await vscode.window.showTextDocument(doc, { preview: false });
+		}
 	} catch {
 		vscode.window.showErrorMessage(`Failed to create ${filename}`);
 	}
 }
 
-async function runInTerminal(command: string) {
-	const terminal = vscode.window.createTerminal("Quickpanel");
+/** Always open a fresh terminal — never reuse an existing one. */
+function createQuickpanelTerminal(cwd?: string, label?: string): vscode.Terminal {
+	const raw = (label || 'run').replace(/\s+/g, ' ').trim();
+	const short = raw.length > 40 ? raw.slice(0, 37) + '…' : raw;
+	const terminal = vscode.window.createTerminal({
+		name: `Quickpanel: ${short}`,
+		cwd: cwd || undefined
+	});
 	terminal.show();
+	return terminal;
+}
+
+async function runInTerminal(command: string, cwd?: string, label?: string) {
+	const terminal = createQuickpanelTerminal(cwd, label);
 	terminal.sendText(command);
+}
+
+/**
+ * Build a short-lived Node runner that executes process steps in order.
+ * Keeps the terminal command one line (`node /tmp/...js`) while still
+ * waiting for each scaffold command before writing follow-up files.
+ */
+function buildRunnerScript(cwd: string, steps: ProjectStepPayload[]): string {
+	const lines: string[] = [
+		`'use strict';`,
+		`const { execSync } = require('child_process');`,
+		`const fs = require('fs');`,
+		`const path = require('path');`,
+		`const cwd = ${JSON.stringify(cwd)};`,
+		`process.chdir(cwd);`,
+		`let n = 0;`,
+		`function runCmd(label, cmd) {`,
+		`  n++;`,
+		`  console.log('\\n▶ [' + n + '] ' + label);`,
+		`  execSync(cmd, { stdio: 'inherit', shell: true, cwd });`,
+		`}`,
+		`function writeFile(label, filename, content) {`,
+		`  n++;`,
+		`  console.log('\\n▶ [' + n + '] ' + label);`,
+		`  const full = path.resolve(cwd, filename);`,
+		`  fs.mkdirSync(path.dirname(full), { recursive: true });`,
+		`  fs.writeFileSync(full, content, 'utf8');`,
+		`  console.log('   ✓ wrote ' + filename);`,
+		`}`,
+		`try {`
+	];
+
+	for (const step of steps) {
+		if (step.stepType === 'command' && step.commandText) {
+			const label = step.label || step.commandText;
+			lines.push(
+				`  runCmd(${JSON.stringify(label)}, ${JSON.stringify(step.commandText)});`
+			);
+		} else if (step.stepType === 'file' && step.filename) {
+			const label = step.label || `Create ${step.filename}`;
+			lines.push(
+				`  writeFile(${JSON.stringify(label)}, ${JSON.stringify(step.filename)}, ${JSON.stringify(step.content ?? '')});`
+			);
+		}
+	}
+
+	lines.push(
+		`  console.log('\\n✓ All steps finished');`,
+		`} catch (err) {`,
+		`  console.error('\\n✗ Step failed:', err && err.message ? err.message : err);`,
+		`  process.exitCode = 1;`,
+		`} finally {`,
+		`  try { fs.unlinkSync(__filename); } catch (_) {}`,
+		`}`
+	);
+
+	return lines.join('\n');
+}
+
+/**
+ * Run every process step in order.
+ * File-only processes use the VS Code FS API.
+ * Processes that include commands write a temp runner script and execute it
+ * with a single short `node …` line so the terminal stays readable.
+ */
+async function runAllProjectSteps(steps: ProjectStepPayload[], processName?: string) {
+	if (!steps.length) {
+		return;
+	}
+
+	const hasCommand = steps.some(s => s.stepType === 'command');
+
+	if (!hasCommand) {
+		for (const step of steps) {
+			if (step.stepType === 'file' && step.filename) {
+				await createFile(step.filename, step.content ?? '', { force: true, skipOpen: true });
+			}
+		}
+		vscode.window.showInformationMessage(`Created ${steps.length} file(s)`);
+		return;
+	}
+
+	const folders = vscode.workspace.workspaceFolders;
+	if (!folders) {
+		vscode.window.showErrorMessage("Open a folder first");
+		return;
+	}
+
+	const cwd = folders[0].uri.fsPath;
+	const scriptPath = path.join(os.tmpdir(), `quickpanel-run-${Date.now()}.js`);
+
+	try {
+		fs.writeFileSync(scriptPath, buildRunnerScript(cwd, steps), 'utf8');
+	} catch {
+		vscode.window.showErrorMessage('Failed to prepare process runner script');
+		return;
+	}
+
+	// One short, readable line in a brand-new terminal — sequential steps, no quoting hell
+	const label = processName ? `Run All — ${processName}` : 'Run All';
+	await runInTerminal(`node ${JSON.stringify(scriptPath)}`, cwd, label);
 }
 
 function getWebviewContent(

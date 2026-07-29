@@ -1,10 +1,16 @@
 # ⚡ Quickpanel
 
+![Quickpanel demo](media/quickpanel-gif-1.gif)
+
 **Your personal command center inside VS Code.**
 
 Quickpanel gives you instant access to multi-step processes, file templates, notes and shortcuts — without ever leaving your editor.
 
 ---
+
+![Quickpanel screenshot 1](media/screenshot-1.png)
+
+![Quickpanel screenshot 2](media/screenshot-2.png)
 
 ### ✨ Features
 
@@ -43,8 +49,22 @@ On first install you get useful starter content:
 - Agent Skills:
   - Add React/Next.js Best Practices Skill
   - Add Supabase Postgres Best Practices Skill
-- Ready-to-use file templates (`.env`, `.gitignore`, `Agents.md`, `README.md`)
+- Ready-to-use file templates (`.env`, `.gitignore`, `AGENTS.md`, `README.md`)
 - One example shortcut (Format Document)
+
+### AGENTS.md vs Skills
+
+These are **two different** agent-context systems:
+
+| | **AGENTS.md** (repo root) | **Skills** (`.agents/skills/…`) |
+|--|--|--|
+| Created by | Quickpanel file steps / templates | `npx skills add …` |
+| Main file | One project-wide rules doc | Per-skill `SKILL.md` |
+| Used by agents | Always (passive rules) | On demand when relevant |
+
+Installing a skill does **not** create or replace root `AGENTS.md`, and adding a second skill should not remove the first — skills live under `.agents/skills/<name>/`.
+
+Each command step (and each Run All) opens a **new** VS Code terminal so previous output stays visible.
 
 ---
 
