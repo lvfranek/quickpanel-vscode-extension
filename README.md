@@ -2,17 +2,17 @@
 
 **Your personal command center inside VS Code.**
 
-Quickpanel gives you instant access to shortcuts, notes, file templates and multi-step processes — without ever leaving your editor.
+Quickpanel gives you instant access to multi-step processes, file templates, notes and shortcuts — without ever leaving your editor.
 
 ---
 
 ### ✨ Features
 
 - **4 Modern Tabs**
-  - ⌨️ **Shortcuts** – Save and quickly access your most used keybindings & commands
-  - 📝 **Notes** – Write and keep rich markdown notes right inside VS Code
-  - 📄 **Files** – Create files from templates with one click
   - ⚙️ **Processes & Skills** – Run multi-step workflows (commands + file creation)
+  - 📄 **Files** – Create files from templates with one click
+  - 📝 **Notes** – Write and keep rich markdown notes right inside VS Code
+  - ⌨️ **Shortcuts** – Save and quickly access your most used keybindings & commands
 
 - Full **drag & drop** reordering of items and process steps
 - Custom confirm dialogs
@@ -25,7 +25,7 @@ Quickpanel gives you instant access to shortcuts, notes, file templates and mult
 
 1. Click the **⚡ Quickpanel** status bar item (bottom right)
 2. Or run the command: `Quickpanel: Open`
-3. Start adding your own shortcuts, notes, file templates or processes
+3. Start adding your own processes, file templates, notes or shortcuts
 
 ---
 
@@ -33,8 +33,6 @@ Quickpanel gives you instant access to shortcuts, notes, file templates and mult
 
 On first install you get useful starter content:
 
-- One example shortcut (Format Document)
-- Ready-to-use file templates (`.env`, `.gitignore`, `Agents.md`, `README.md`)
 - Popular processes:
   - Create Next.js App
   - Create React (Vite) App
@@ -45,6 +43,8 @@ On first install you get useful starter content:
 - Agent Skills:
   - Add React/Next.js Best Practices Skill
   - Add Supabase Postgres Best Practices Skill
+- Ready-to-use file templates (`.env`, `.gitignore`, `Agents.md`, `README.md`)
+- One example shortcut (Format Document)
 
 ---
 
