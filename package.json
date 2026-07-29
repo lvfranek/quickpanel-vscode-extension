@@ -8,7 +8,7 @@
   },
   "license": "MIT",
   "description": "Quick access panel for shortcuts, notes and file templates",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "engines": {
     "vscode": "^1.125.0"
   },
