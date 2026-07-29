@@ -17,6 +17,8 @@
   let editingNoteId    = null;
   let editingFileId    = null;
   let editingProjectId = null;
+  let editingStepId    = null; // step id currently being edited
+  let editingStepProjectId = null;
 
   let dragSrcId        = null;
   let dragSrcType      = null;
@@ -107,90 +109,189 @@
   });
 
   // ════════════════════════════════════════
-  //  DRAG & DROP — generic list binder
+  //  DRAG & DROP — handle-initiated (avoids nested-draggable conflicts)
   // ════════════════════════════════════════
+
+  /**
+   * Only the .drag-handle starts a drag. The row/card stays non-draggable
+   * until mousedown on its own handle, so nested steps don't fight parent cards.
+   */
+  function wireHandleDrag(item, handle, hooks) {
+    if (!item || !handle) { return; }
+
+    item.setAttribute('draggable', 'false');
+
+    handle.addEventListener('mousedown', function (e) {
+      e.stopPropagation();
+      item.setAttribute('draggable', 'true');
+    });
+
+    // Clicking anywhere else on the row must not allow an accidental drag
+    item.addEventListener('mousedown', function (e) {
+      if (!handle.contains(e.target)) {
+        item.setAttribute('draggable', 'false');
+      }
+    }, true);
+
+    item.addEventListener('dragstart', function (e) {
+      // Nested case: a step drag must never start the parent process drag
+      if (hooks.shouldIgnore && hooks.shouldIgnore(e)) {
+        e.preventDefault();
+        item.setAttribute('draggable', 'false');
+        return;
+      }
+      if (item.getAttribute('draggable') !== 'true') {
+        e.preventDefault();
+        return;
+      }
+      e.stopPropagation();
+      // Required in some webviews for drag to activate
+      try {
+        e.dataTransfer.setData('text/plain', item.dataset.id || 'drag');
+        e.dataTransfer.effectAllowed = 'move';
+      } catch (_) { /* ignore */ }
+      hooks.onStart && hooks.onStart(e);
+    });
+
+    item.addEventListener('dragend', function (e) {
+      e.stopPropagation();
+      item.setAttribute('draggable', 'false');
+      hooks.onEnd && hooks.onEnd(e);
+    });
+
+    item.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      try { e.dataTransfer.dropEffect = 'move'; } catch (_) { /* ignore */ }
+      hooks.onOver && hooks.onOver(e);
+    });
+
+    item.addEventListener('dragleave', function (e) {
+      e.stopPropagation();
+      hooks.onLeave && hooks.onLeave(e);
+    });
+
+    item.addEventListener('drop', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      hooks.onDrop && hooks.onDrop(e);
+    });
+  }
+
   function bindDrag(containerId, dragType, dataArray, onDrop) {
     var container = document.getElementById(containerId);
     if (!container) { return; }
     var items = container.querySelectorAll('[data-drag-type="' + dragType + '"]');
 
+    function clearOver() {
+      container.querySelectorAll('[data-drag-type="' + dragType + '"]').forEach(function (i) {
+        i.classList.remove('drag-over');
+      });
+    }
+
     items.forEach(function (item) {
-      item.ondragstart = function (e) {
-        dragSrcId   = item.dataset.id;
-        dragSrcType = dragType;
-        item.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-      };
-      item.ondragend = function () {
-        item.classList.remove('dragging');
-        container.querySelectorAll('[data-drag-type="' + dragType + '"]').forEach(function (i) { i.classList.remove('drag-over'); });
-        dragSrcId   = null;
-        dragSrcType = null;
-      };
-      item.ondragover = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = 'move';
-        container.querySelectorAll('[data-drag-type="' + dragType + '"]').forEach(function (i) { i.classList.remove('drag-over'); });
-        item.classList.add('drag-over');
-      };
-      item.ondragleave = function () { item.classList.remove('drag-over'); };
-      item.ondrop = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        item.classList.remove('drag-over');
-        if (!dragSrcId || dragSrcId === item.dataset.id || dragSrcType !== dragType) { return; }
-        var fromIdx = dataArray.findIndex(function (x) { return x.id === dragSrcId; });
-        var toIdx   = dataArray.findIndex(function (x) { return x.id === item.dataset.id; });
-        if (fromIdx < 0 || toIdx < 0) { return; }
-        var moved = dataArray.splice(fromIdx, 1)[0];
-        dataArray.splice(toIdx, 0, moved);
-        onDrop();
-      };
+      // Prefer the card/row's own handle, not a nested step handle
+      var handle = item.querySelector(':scope > .drag-handle')
+        || item.querySelector(':scope > .project-header > .drag-handle')
+        || item.querySelector('.project-header > .drag-handle')
+        || item.querySelector('.drag-handle');
+
+      wireHandleDrag(item, handle, {
+        shouldIgnore: function (e) {
+          // Process cards: ignore drags that originate inside a step row
+          if (dragType === 'project') {
+            var t = e.target;
+            if (t && t.closest && t.closest('[data-drag-type="step"]')) {
+              return true;
+            }
+          }
+          return false;
+        },
+        onStart: function () {
+          dragSrcId   = item.dataset.id;
+          dragSrcType = dragType;
+          item.classList.add('dragging');
+        },
+        onEnd: function () {
+          item.classList.remove('dragging');
+          clearOver();
+          dragSrcId   = null;
+          dragSrcType = null;
+        },
+        onOver: function () {
+          if (dragSrcType !== dragType) { return; }
+          clearOver();
+          item.classList.add('drag-over');
+        },
+        onLeave: function () {
+          item.classList.remove('drag-over');
+        },
+        onDrop: function () {
+          item.classList.remove('drag-over');
+          if (!dragSrcId || dragSrcId === item.dataset.id || dragSrcType !== dragType) { return; }
+          var fromIdx = dataArray.findIndex(function (x) { return x.id === dragSrcId; });
+          var toIdx   = dataArray.findIndex(function (x) { return x.id === item.dataset.id; });
+          if (fromIdx < 0 || toIdx < 0) { return; }
+          var moved = dataArray.splice(fromIdx, 1)[0];
+          dataArray.splice(toIdx, 0, moved);
+          onDrop();
+        }
+      });
     });
   }
 
   function bindStepDrag(projectId, stepsArray, onDrop) {
     var container = document.getElementById('steps-list-' + projectId);
     if (!container) { return; }
-    var items = container.querySelectorAll('[data-drag-type="step"]');
+    var items = Array.prototype.slice.call(container.querySelectorAll('[data-drag-type="step"]'));
+
+    function clearOver() {
+      items.forEach(function (i) { i.classList.remove('drag-over'); });
+    }
 
     items.forEach(function (item) {
-      item.ondragstart = function (e) {
-        dragSrcId        = item.dataset.id;
-        dragSrcType      = 'step';
-        dragSrcProjectId = projectId;
-        item.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-      };
-      item.ondragend = function () {
-        item.classList.remove('dragging');
-        items.forEach(function (i) { i.classList.remove('drag-over'); });
-        dragSrcId        = null;
-        dragSrcType      = null;
-        dragSrcProjectId = null;
-      };
-      item.ondragover = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.dataTransfer.dropEffect = 'move';
-        items.forEach(function (i) { i.classList.remove('drag-over'); });
-        item.classList.add('drag-over');
-      };
-      item.ondragleave = function () { item.classList.remove('drag-over'); };
-      item.ondrop = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        item.classList.remove('drag-over');
-        if (!dragSrcId || dragSrcId === item.dataset.id || dragSrcType !== 'step') { return; }
-        if (dragSrcProjectId !== projectId) { return; }
-        var fromIdx = stepsArray.findIndex(function (s) { return s.id === dragSrcId; });
-        var toIdx   = stepsArray.findIndex(function (s) { return s.id === item.dataset.id; });
-        if (fromIdx < 0 || toIdx < 0) { return; }
-        var moved = stepsArray.splice(fromIdx, 1)[0];
-        stepsArray.splice(toIdx, 0, moved);
-        onDrop();
-      };
+      var handle = item.querySelector(':scope > .drag-handle') || item.querySelector('.drag-handle');
+
+      wireHandleDrag(item, handle, {
+        onStart: function () {
+          dragSrcId        = item.dataset.id;
+          dragSrcType      = 'step';
+          dragSrcProjectId = projectId;
+          item.classList.add('dragging');
+          // Keep parent process card out of the drag while reordering steps
+          var parentCard = item.closest('[data-drag-type="project"]');
+          if (parentCard) {
+            parentCard.setAttribute('draggable', 'false');
+            parentCard.classList.remove('dragging', 'drag-over');
+          }
+        },
+        onEnd: function () {
+          item.classList.remove('dragging');
+          clearOver();
+          dragSrcId        = null;
+          dragSrcType      = null;
+          dragSrcProjectId = null;
+        },
+        onOver: function () {
+          if (dragSrcType !== 'step' || dragSrcProjectId !== projectId) { return; }
+          clearOver();
+          item.classList.add('drag-over');
+        },
+        onLeave: function () {
+          item.classList.remove('drag-over');
+        },
+        onDrop: function () {
+          item.classList.remove('drag-over');
+          if (!dragSrcId || dragSrcId === item.dataset.id || dragSrcType !== 'step') { return; }
+          if (dragSrcProjectId !== projectId) { return; }
+          var fromIdx = stepsArray.findIndex(function (s) { return s.id === dragSrcId; });
+          var toIdx   = stepsArray.findIndex(function (s) { return s.id === item.dataset.id; });
+          if (fromIdx < 0 || toIdx < 0) { return; }
+          var moved = stepsArray.splice(fromIdx, 1)[0];
+          stepsArray.splice(toIdx, 0, moved);
+          onDrop();
+        }
+      });
     });
   }
 
@@ -437,6 +538,32 @@
   var openStepForms   = new Set();
   var stepTypeSelection = {};
 
+  function clearStepEdit(projectId) {
+    if (projectId) {
+      openStepForms.delete(projectId);
+      delete stepTypeSelection[projectId];
+    }
+    editingStepId = null;
+    editingStepProjectId = null;
+  }
+
+  function openStepEditor(projectId, step) {
+    openProjects.add(projectId);
+    openStepForms.add(projectId);
+    if (step) {
+      editingStepId = step.id;
+      editingStepProjectId = projectId;
+      stepTypeSelection[projectId] = step.type || 'command';
+    } else {
+      editingStepId = null;
+      editingStepProjectId = null;
+      stepTypeSelection[projectId] = stepTypeSelection[projectId] || 'command';
+    }
+    renderProjects();
+    var labelEl = document.getElementById('step-label-' + projectId);
+    if (labelEl) { labelEl.focus(); }
+  }
+
   function renderProjects() {
     var list = document.getElementById('projects-list');
     if (!projects.length) {
@@ -447,23 +574,35 @@
     list.innerHTML = projects.map(function (p) {
       var isOpen       = openProjects.has(p.id);
       var showStepForm = openStepForms.has(p.id);
-      var stepType     = stepTypeSelection[p.id] || 'command';
+      var isEditingStep = editingStepProjectId === p.id && !!editingStepId;
+      var editingStep  = isEditingStep
+        ? p.steps.find(function (s) { return s.id === editingStepId; })
+        : null;
+      var stepType     = stepTypeSelection[p.id]
+        || (editingStep && editingStep.type)
+        || 'command';
 
       var stepsHtml = p.steps.length
         ? p.steps.map(function (step, idx) {
+            var isThisEditing = editingStepId === step.id && editingStepProjectId === p.id;
             var runBtn = step.type === 'file'
               ? '<button class="btn small" data-run-step="' + step.id + '" data-project-id="' + p.id + '">Create File</button>'
               : '<button class="btn small" data-run-step="' + step.id + '" data-project-id="' + p.id + '">Run</button>';
-            return '<div class="step-item" draggable="true" data-id="' + step.id + '" data-project-id="' + p.id + '" data-drag-type="step">' +
-              '<div class="drag-handle" title="Drag to reorder">⠿</div>' +
+            var detail = step.type === 'file'
+              ? escapeHtml(step.filename || '')
+              : escapeHtml(step.command || '');
+            return '<div class="step-item' + (isThisEditing ? ' step-editing' : '') + '" draggable="false" data-id="' + step.id + '" data-project-id="' + p.id + '" data-drag-type="step">' +
+              '<div class="drag-handle" title="Drag to reorder" draggable="false">⠿</div>' +
               '<div class="step-number">' + (idx + 1) + '</div>' +
               '<div class="step-info">' +
                 '<div class="step-label">' + escapeHtml(step.label) + '</div>' +
                 '<span class="step-type-badge ' + step.type + '">' + (step.type === 'file' ? '📄 file' : '⌘ command') + '</span>' +
+                (detail ? '<div class="step-detail">' + detail + '</div>' : '') +
               '</div>' +
               '<div class="step-actions">' +
                 runBtn +
-                '<button class="icon-btn danger" data-delete-step="' + step.id + '" data-project-id="' + p.id + '">×</button>' +
+                '<button class="icon-btn" data-edit-step="' + step.id + '" data-project-id="' + p.id + '" title="Edit step">✎</button>' +
+                '<button class="icon-btn danger" data-delete-step="' + step.id + '" data-project-id="' + p.id + '" title="Delete step">×</button>' +
               '</div>' +
               '</div>';
           }).join('')
@@ -471,39 +610,47 @@
 
       var cmdWrapStyle  = stepType === 'file' ? 'display:none' : '';
       var fileWrapStyle = stepType === 'file' ? '' : 'display:none';
+      var formTitle     = isEditingStep ? 'Edit Step' : 'New Step';
+      var saveLabel     = isEditingStep ? 'Save Step' : 'Add Step';
+      var labelVal      = editingStep ? escapeHtml(editingStep.label || '') : '';
+      var commandVal    = editingStep && editingStep.type === 'command' ? escapeHtml(editingStep.command || '') : '';
+      var filenameVal   = editingStep && editingStep.type === 'file' ? escapeHtml(editingStep.filename || '') : '';
+      var contentVal    = editingStep && editingStep.type === 'file' ? escapeHtml(editingStep.content || '') : '';
+
       var stepFormHtml  =
         '<div class="add-step-form' + (showStepForm ? '' : ' hidden') + '" id="step-form-' + p.id + '">' +
-          '<input id="step-label-' + p.id + '" placeholder="Step label (e.g. Install dependencies)" />' +
+          '<div class="step-form-title">' + formTitle + '</div>' +
+          '<input id="step-label-' + p.id + '" placeholder="Step title (e.g. Install dependencies)" value="' + labelVal + '" />' +
           '<div class="step-type-toggle">' +
             '<button class="type-opt' + (stepType === 'command' ? ' selected' : '') + '" data-type-select="command" data-project-id="' + p.id + '">⌘ Command</button>' +
             '<button class="type-opt' + (stepType === 'file' ? ' selected' : '') + '" data-type-select="file" data-project-id="' + p.id + '">📄 File</button>' +
           '</div>' +
           '<div id="step-command-wrap-' + p.id + '" style="' + cmdWrapStyle + '">' +
-            '<input id="step-command-' + p.id + '" placeholder="Terminal command (e.g. npm install)" />' +
+            '<input id="step-command-' + p.id + '" placeholder="Terminal command (e.g. npm install)" value="' + commandVal + '" />' +
           '</div>' +
           '<div id="step-file-wrap-' + p.id + '" style="' + fileWrapStyle + '">' +
-            '<input id="step-filename-' + p.id + '" placeholder="Filename (e.g. .env)" />' +
-            '<textarea id="step-fcontent-' + p.id + '" placeholder="File content..." style="min-height:60px;"></textarea>' +
+            '<input id="step-filename-' + p.id + '" placeholder="Filename (e.g. .env)" value="' + filenameVal + '" />' +
+            '<textarea id="step-fcontent-' + p.id + '" placeholder="File content..." style="min-height:60px;">' + contentVal + '</textarea>' +
           '</div>' +
           '<div class="btn-row">' +
-            '<button class="btn small" data-add-step="' + p.id + '">Add Step</button>' +
+            '<button class="btn small" data-save-step="' + p.id + '">' + saveLabel + '</button>' +
             '<button class="btn secondary small" data-cancel-step="' + p.id + '">Cancel</button>' +
           '</div>' +
         '</div>';
 
       var expandLabel = isOpen ? ('Steps (' + p.steps.length + ') ▲') : ('Steps (' + p.steps.length + ') ▼');
 
-      return '<div class="project-card' + (isOpen ? ' open' : '') + '" draggable="true" data-id="' + p.id + '" data-drag-type="project">' +
+      return '<div class="project-card' + (isOpen ? ' open' : '') + '" draggable="false" data-id="' + p.id + '" data-project-id="' + p.id + '" data-drag-type="project">' +
         '<div class="project-header">' +
-          '<div class="drag-handle" title="Drag to reorder">⠿</div>' +
+          '<div class="drag-handle" title="Drag to reorder" draggable="false">⠿</div>' +
           '<div class="project-header-info" data-toggle-project="' + p.id + '">' +
             '<div class="project-name">' + escapeHtml(p.name) + '</div>' +
             '<div class="project-desc">' + escapeHtml(p.description) + '</div>' +
           '</div>' +
           '<button class="expand-btn" data-toggle-project="' + p.id + '">' + expandLabel + '</button>' +
           '<div class="actions">' +
-            '<button class="icon-btn" data-edit-project="' + p.id + '" title="Edit">✎</button>' +
-            '<button class="icon-btn danger" data-delete-project="' + p.id + '">×</button>' +
+            '<button class="icon-btn" data-edit-project="' + p.id + '" title="Edit process">✎</button>' +
+            '<button class="icon-btn danger" data-delete-project="' + p.id + '" title="Delete process">×</button>' +
           '</div>' +
         '</div>' +
         '<div class="project-body">' +
@@ -529,8 +676,10 @@
     document.querySelectorAll('[data-delete-project]').forEach(function (btn) {
       btn.onclick = function (e) {
         e.stopPropagation();
-        projects = projects.filter(function (p) { return p.id !== btn.dataset.deleteProject; });
-        openProjects.delete(btn.dataset.deleteProject);
+        var pid = btn.dataset.deleteProject;
+        projects = projects.filter(function (p) { return p.id !== pid; });
+        openProjects.delete(pid);
+        clearStepEdit(pid);
         renderProjects();
         save('saveProjects', projects);
       };
@@ -566,43 +715,86 @@
     document.querySelectorAll('[data-toggle-step-form]').forEach(function (btn) {
       btn.onclick = function () {
         var pid = btn.dataset.toggleStepForm;
-        if (openStepForms.has(pid)) { openStepForms.delete(pid); } else { openStepForms.add(pid); }
-        renderProjects();
+        if (openStepForms.has(pid) && !(editingStepProjectId === pid && editingStepId)) {
+          clearStepEdit(pid);
+          renderProjects();
+          return;
+        }
+        // Open blank form for a new step (cancels any in-progress edit on this process)
+        openStepEditor(pid, null);
       };
     });
 
     document.querySelectorAll('[data-cancel-step]').forEach(function (btn) {
       btn.onclick = function () {
-        openStepForms.delete(btn.dataset.cancelStep);
+        clearStepEdit(btn.dataset.cancelStep);
         renderProjects();
       };
     });
 
-    document.querySelectorAll('[data-add-step]').forEach(function (btn) {
+    document.querySelectorAll('[data-save-step]').forEach(function (btn) {
       btn.onclick = function () {
-        var pid   = btn.dataset.addStep;
+        var pid   = btn.dataset.saveStep;
         var label = document.getElementById('step-label-' + pid).value.trim();
         if (!label) { return; }
         var type = stepTypeSelection[pid] || 'command';
         var p    = projects.find(function (x) { return x.id === pid; });
         if (!p) { return; }
 
-        var step;
+        var payload;
         if (type === 'file') {
           var filename = document.getElementById('step-filename-' + pid).value.trim();
           var content  = document.getElementById('step-fcontent-' + pid).value;
           if (!filename) { return; }
-          step = { id: uid(), label: label, type: 'file', filename: filename, content: content };
+          payload = { label: label, type: 'file', filename: filename, content: content, command: undefined };
         } else {
           var command = document.getElementById('step-command-' + pid).value.trim();
           if (!command) { return; }
-          step = { id: uid(), label: label, type: 'command', command: command };
+          payload = { label: label, type: 'command', command: command, filename: undefined, content: undefined };
         }
 
-        p.steps.push(step);
-        openStepForms.delete(pid);
+        if (editingStepId && editingStepProjectId === pid) {
+          var existing = p.steps.find(function (s) { return s.id === editingStepId; });
+          if (existing) {
+            existing.label = payload.label;
+            existing.type = payload.type;
+            if (payload.type === 'file') {
+              existing.filename = payload.filename;
+              existing.content = payload.content;
+              delete existing.command;
+            } else {
+              existing.command = payload.command;
+              delete existing.filename;
+              delete existing.content;
+            }
+          }
+        } else {
+          var step = { id: uid(), label: payload.label, type: payload.type };
+          if (payload.type === 'file') {
+            step.filename = payload.filename;
+            step.content = payload.content;
+          } else {
+            step.command = payload.command;
+          }
+          p.steps.push(step);
+        }
+
+        clearStepEdit(pid);
         save('saveProjects', projects);
         renderProjects();
+      };
+    });
+
+    document.querySelectorAll('[data-edit-step]').forEach(function (btn) {
+      btn.onclick = function (e) {
+        e.stopPropagation();
+        var pid    = btn.dataset.projectId;
+        var stepId = btn.dataset.editStep;
+        var p      = projects.find(function (x) { return x.id === pid; });
+        if (!p) { return; }
+        var step = p.steps.find(function (s) { return s.id === stepId; });
+        if (!step) { return; }
+        openStepEditor(pid, step);
       };
     });
 
@@ -614,6 +806,9 @@
         var p      = projects.find(function (x) { return x.id === pid; });
         if (!p) { return; }
         p.steps = p.steps.filter(function (s) { return s.id !== stepId; });
+        if (editingStepId === stepId) {
+          clearStepEdit(pid);
+        }
         save('saveProjects', projects);
         renderProjects();
       };

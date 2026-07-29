@@ -1,6 +1,12 @@
 {
   "name": "quickpanel",
   "displayName": "Quickpanel",
+  "publisher": "lvfranek",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lvfranek/quickpanel-vscode-extension"
+  },
+  "license": "MIT",
   "description": "Quick access panel for shortcuts, notes and file templates",
   "version": "0.0.1",
   "engines": {
@@ -9,6 +15,7 @@
   "categories": [
     "Other"
   ],
+  "icon": "icon.png",
   "activationEvents": [],
   "main": "./dist/extension.js",
 "contributes": {

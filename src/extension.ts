@@ -58,7 +58,8 @@ export function activate(context: vscode.ExtensionContext) {
 		);
 		panel.iconPath = new vscode.ThemeIcon("zap");
 
-		const shortcuts: Shortcut[] = context.globalState.get("shortcuts", []);
+		// Defaults apply only when the key has never been set (fresh install).
+		const shortcuts: Shortcut[] = context.globalState.get("shortcuts", getDefaultShortcuts());
 		const notes: Note[] = context.globalState.get("notes", []);
 		const files: FileTemplate[] = context.globalState.get("files", getDefaultFiles());
 		const projects: ProjectType[] = context.globalState.get("projects", getDefaultProjects());
@@ -103,64 +104,198 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(statusBarItem, openCommand);
 }
 
+const DEFAULT_ENV_CONTENT = "NODE_ENV=development\n";
+
+const DEFAULT_AGENTS_MD = `# CRITICAL RULES - MUST FOLLOW
+## RESPONSES
+- Keep responses concise and to the point - unless the user asks otherwise
+## PLANNING MODE
+- Always ask clarifying questions
+- Never assume design, tech stack or features
+- Use deep-dive sub-agents to assist with research
+- Use deep-dive sub-agents to review the different aspects of your plan before presenting to the user
+## CHANGE / EDIT MODE
+- Never implement features yourself when possible - use sub-agents!
+- Identify changes from the plan that can be implemented in parallel, and use sub-agents to implement the features efficiently
+- When using sub-agents to implement features, act as a coordinator only
+- Use the best model for the task - premium models for complex tasks (like coding) and mid-tier models for simpler tasks, like documentation
+- After completing features (large or small), always run commands like lint, type check and next build to check code quality
+## DATABASE SCHEMA CHANGES
+- Whenever you make changes to the database schema, ALWAYS run the drizzle generate and migrate commands
+- NEVER run drizzle push!
+- For all ID columns NOT related to BetterAuth, use UUID for the ID columns and be randomly generated
+## TESTING
+- Use any testing tools, libraries available to the project for testing your changes
+- Never assume your changes simply work, always test!
+- If the project does not have any testing tools, scripts, MCP tools, skills, etc. available for testing, ask the user whether testing should be skipped.
+## UI DESIGN
+- Always follow the UI design system when creating or reviewing components or pages.
+- Design System: @DESIGN.md
+`;
+
+const DEFAULT_GITIGNORE = `### macOS ###
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon must end with two \\r
+Icon\r\r
+
+# Thumbnails
+._*
+
+# Files that might appear in the root of a volume
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# Directories potentially created on remote AFP share
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+### macOS Patch ###
+# iCloud generated files
+*.icloud
+
+### Windows ###
+# Windows thumbnail cache files
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+
+# Dump file
+*.stackdump
+
+# Folder config file
+[Dd]esktop.ini
+
+# Recycle Bin used on file shares
+$RECYCLE.BIN/
+
+# Windows Installer files
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# Windows shortcuts
+*.lnk
+
+# Environment
+.env
+`;
+
+const DEFAULT_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Project</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>Hello World</h1>
+  <script src="script.js" defer></script>
+</body>
+</html>
+`;
+
+const DEFAULT_CSS = `*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+  padding: 2rem;
+  color: #111;
+  background: #fff;
+}
+`;
+
+function getDefaultShortcuts(): Shortcut[] {
+	return [
+		{
+			id: "sc1",
+			title: "Format Document",
+			description: "Mac: Option + Shift + F  |  Windows/Linux: Shift + Alt + F"
+		}
+	];
+}
+
 function getDefaultFiles(): FileTemplate[] {
 	return [
-		{ id: "1", name: ".env", filename: ".env", content: "NODE_ENV=development\n" },
-		{ id: "2", name: ".gitignore", filename: ".gitignore", content: "node_modules\n.env\n.DS_Store\ndist\n.next\n" },
-		{ id: "3", name: "Agents.md", filename: "Agents.md", content: "# Agents\n\n" },
-		{ id: "4", name: "README.md", filename: "README.md", content: "# Project\n\n" }
+		{ id: "1", name: ".env", filename: ".env", content: DEFAULT_ENV_CONTENT },
+		{ id: "2", name: ".gitignore", filename: ".gitignore", content: DEFAULT_GITIGNORE },
+		{ id: "3", name: "Agents.md", filename: "Agents.md", content: DEFAULT_AGENTS_MD },
+		{ id: "4", name: "README.md", filename: "README.md", content: "# Project\n" }
 	];
 }
 
 function getDefaultProjects(): ProjectType[] {
 	return [
+		// ── Processes ──
 		{
 			id: "proj1",
-			name: "Next.js App",
-			description: "Full-stack Next.js with TypeScript, Tailwind & App Router",
+			name: "Create Next.js App",
+			description: "Scaffold a Next.js app with TypeScript, Tailwind, ESLint and App Router",
 			steps: [
 				{
 					id: "p1s1",
-					label: "Create Next.js project",
+					label: "Create a new Next.js application with TypeScript, Tailwind, ESLint and App Router in the current folder",
 					type: "command",
-					command: "npx create-next-app@latest ./ --ts --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack"
+					command: "npx create-next-app@latest . --ts --tailwind --eslint --app --src-dir --import-alias \"@/*\" --use-npm"
 				},
 				{
 					id: "p1s2",
-					label: "Create .env file",
+					label: "Add a .env file with NODE_ENV set to development",
 					type: "file",
 					filename: ".env",
-					content: "NODE_ENV=development\n"
+					content: DEFAULT_ENV_CONTENT
 				},
 				{
 					id: "p1s3",
-					label: "Create Agents.md",
+					label: "Add Agents.md with critical agent rules for this project",
 					type: "file",
 					filename: "Agents.md",
-					content: "# Agents\n\n"
+					content: DEFAULT_AGENTS_MD
 				}
 			]
 		},
 		{
 			id: "proj2",
-			name: "React (Vite)",
-			description: "React app with Vite and TypeScript",
+			name: "Create React (Vite) App",
+			description: "Scaffold a React + TypeScript app with Vite",
 			steps: [
 				{
 					id: "p2s1",
-					label: "Create Vite React project",
+					label: "Create a new React TypeScript project with Vite in the current folder",
 					type: "command",
 					command: "npm create vite@latest . -- --template react-ts"
 				},
 				{
 					id: "p2s2",
-					label: "Install dependencies",
+					label: "Install project dependencies",
 					type: "command",
 					command: "npm install"
 				},
 				{
 					id: "p2s3",
-					label: "Create .env file",
+					label: "Add a .env file with VITE_APP_NAME for client-side config",
 					type: "file",
 					filename: ".env",
 					content: "VITE_APP_NAME=my-app\n"
@@ -169,26 +304,26 @@ function getDefaultProjects(): ProjectType[] {
 		},
 		{
 			id: "proj3",
-			name: "Simple HTML + CSS + JS",
-			description: "Bare-bones static site with three files",
+			name: "Create Simple HTML + CSS + JS",
+			description: "Three-file static site: HTML, CSS reset and a starter script",
 			steps: [
 				{
 					id: "p3s1",
-					label: "Create index.html",
+					label: "Create a clean modern HTML5 boilerplate linked to style.css and script.js",
 					type: "file",
 					filename: "index.html",
-					content: "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>My Project</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1>Hello World</h1>\n  <script src=\"script.js\"><" + "/script>\n</body>\n</html>\n"
+					content: DEFAULT_HTML
 				},
 				{
 					id: "p3s2",
-					label: "Create style.css",
+					label: "Create a simple CSS reset with a system font stack",
 					type: "file",
 					filename: "style.css",
-					content: "* { box-sizing: border-box; margin: 0; padding: 0; }\nbody {\n  font-family: system-ui, sans-serif;\n  padding: 2rem;\n}\n"
+					content: DEFAULT_CSS
 				},
 				{
 					id: "p3s3",
-					label: "Create script.js",
+					label: "Create script.js with a Hello World console log",
 					type: "file",
 					filename: "script.js",
 					content: "console.log('Hello World');\n"
@@ -197,53 +332,109 @@ function getDefaultProjects(): ProjectType[] {
 		},
 		{
 			id: "proj4",
-			name: "Angular",
-			description: "Angular app with routing and SCSS",
+			name: "Create Angular App",
+			description: "Scaffold an Angular app with routing and SCSS",
 			steps: [
 				{
 					id: "p4s1",
-					label: "Install Angular CLI",
+					label: "Install the Angular CLI globally",
 					type: "command",
 					command: "npm install -g @angular/cli"
 				},
 				{
 					id: "p4s2",
-					label: "Create Angular project",
+					label: "Create a new Angular project in the current folder with routing and SCSS",
 					type: "command",
-					command: "ng new . --routing --style scss --no-create-application"
+					command: "ng new . --routing --style=scss --skip-git --defaults"
 				},
 				{
 					id: "p4s3",
-					label: "Create .env file",
+					label: "Add a .env file with NODE_ENV set to development",
 					type: "file",
 					filename: ".env",
-					content: "NODE_ENV=development\n"
+					content: DEFAULT_ENV_CONTENT
 				}
 			]
 		},
 		{
 			id: "proj5",
-			name: "Next.js / React Best Practices Skill",
-			description: "Install vercel-labs React agent skills",
+			name: "Add Tailwind CSS",
+			description: "Install Tailwind CSS v4 with the official Vite plugin (works for Vite; Next.js can use the same CSS import)",
 			steps: [
 				{
 					id: "p5s1",
-					label: "Install React Best Practices Skill",
+					label: "Install Tailwind CSS and the official @tailwindcss/vite plugin as dev dependencies",
 					type: "command",
-					command: "npx skills add vercel-labs/agent-skills/vercel-react-best-practices"
+					command: "npm install -D tailwindcss @tailwindcss/vite"
+				},
+				{
+					id: "p5s2",
+					label: "Add the Tailwind CSS import to your main stylesheet (also register tailwindcss() in vite.config plugins)",
+					type: "file",
+					filename: "src/index.css",
+					content: '@import "tailwindcss";\n'
 				}
 			]
 		},
 		{
 			id: "proj6",
-			name: "All Vercel Agent Skills",
-			description: "Full collection of vercel-labs agent skills",
+			name: "Create Clean Empty Project",
+			description: "Minimal starter: gitignore, env, README and Agents.md",
 			steps: [
 				{
 					id: "p6s1",
-					label: "Install All Vercel Skills",
+					label: "Add a .gitignore covering macOS, Windows and .env",
+					type: "file",
+					filename: ".gitignore",
+					content: DEFAULT_GITIGNORE
+				},
+				{
+					id: "p6s2",
+					label: "Add a .env file with NODE_ENV set to development",
+					type: "file",
+					filename: ".env",
+					content: DEFAULT_ENV_CONTENT
+				},
+				{
+					id: "p6s3",
+					label: "Add a minimal README.md",
+					type: "file",
+					filename: "README.md",
+					content: "# Project\n\n"
+				},
+				{
+					id: "p6s4",
+					label: "Add Agents.md with critical agent rules for this project",
+					type: "file",
+					filename: "Agents.md",
+					content: DEFAULT_AGENTS_MD
+				}
+			]
+		},
+		// ── Skills ──
+		{
+			id: "skill1",
+			name: "Add React/Next.js Best Practices Skill",
+			description: "Install the Vercel React/Next.js best-practices agent skill",
+			steps: [
+				{
+					id: "sk1s1",
+					label: "Install the vercel-react-best-practices skill via the skills CLI",
 					type: "command",
-					command: "npx skills add vercel-labs/agent-skills"
+					command: "npx skills add vercel-labs/agent-skills --skill vercel-react-best-practices"
+				}
+			]
+		},
+		{
+			id: "skill2",
+			name: "Add Supabase Postgres Best Practices Skill",
+			description: "Install the Supabase Postgres best-practices agent skill",
+			steps: [
+				{
+					id: "sk2s1",
+					label: "Install the supabase-postgres-best-practices skill via the skills CLI",
+					type: "command",
+					command: "npx skills add supabase/agent-skills --skill supabase-postgres-best-practices"
 				}
 			]
 		}
@@ -366,9 +557,11 @@ function getWebviewContent(
 		'      cursor: grab; padding: 4px 2px; opacity: 0.45;',
 		'      font-size: 14px; line-height: 1; user-select: none;',
 		'      flex-shrink: 0; margin-top: 2px;',
+		'      -webkit-user-drag: none;',
 		'    }',
 		'    .drag-handle:active { cursor: grabbing; }',
 		'    .drag-handle:hover { opacity: 0.8; }',
+		'    .step-item .drag-handle { margin-top: 0; align-self: center; }',
 		'    .item-content { flex: 1; min-width: 0; }',
 		'    .item-title { font-weight: 500; margin-bottom: 3px; word-break: break-word; }',
 		'    .item-desc {',
@@ -488,13 +681,19 @@ function getWebviewContent(
 		'    }',
 		'    .step-info { flex: 1; min-width: 0; }',
 		'    .step-label { font-size: 12px; font-weight: 500; }',
+		'    .step-detail {',
+		'      font-size: 11px; opacity: 0.6; margin-top: 3px;',
+		'      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;',
+		'      font-family: var(--vscode-editor-font-family);',
+		'    }',
 		'    .step-type-badge {',
 		'      display: inline-block; font-size: 10px; padding: 1px 5px;',
 		'      border-radius: 3px; margin-top: 2px; opacity: 0.75;',
 		'    }',
 		'    .step-type-badge.file { background: var(--vscode-editorInfo-foreground); color: #000; }',
 		'    .step-type-badge.command { background: var(--vscode-terminal-ansiGreen); color: #000; }',
-		'    .step-actions { display: flex; gap: 4px; flex-shrink: 0; }',
+		'    .step-actions { display: flex; gap: 4px; flex-shrink: 0; align-items: center; }',
+		'    .step-item.step-editing { box-shadow: 0 0 0 1px var(--vscode-focusBorder); }',
 		'    .run-all-row {',
 		'      display: flex; gap: 8px; align-items: center; margin-top: 6px;',
 		'      padding-top: 8px; border-top: 1px solid var(--vscode-panel-border);',
@@ -506,6 +705,10 @@ function getWebviewContent(
 		'      display: flex; flex-direction: column; gap: 6px;',
 		'    }',
 		'    .add-step-form.hidden { display: none; }',
+		'    .step-form-title {',
+		'      font-size: 11px; font-weight: 600; opacity: 0.7;',
+		'      text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px;',
+		'    }',
 		'    .step-type-toggle { display: flex; gap: 6px; }',
 		'    .type-opt {',
 		'      flex: 1; padding: 5px 8px;',
@@ -537,20 +740,37 @@ function getWebviewContent(
 		'  </div>',
 		'',
 		'  <div class="tabs">',
-		'    <button class="tab active" data-tab="shortcuts">Shortcuts</button>',
-		'    <button class="tab" data-tab="notes">Notes</button>',
+		'    <button class="tab active" data-tab="projects">Processes & Skills</button>',
 		'    <button class="tab" data-tab="files">Files</button>',
-		'    <button class="tab" data-tab="projects">Processes & Skills</button>',
+		'    <button class="tab" data-tab="notes">Notes</button>',
+		'    <button class="tab" data-tab="shortcuts">Shortcuts</button>',
 		'  </div>',
 		'',
-		'  <!-- SHORTCUTS -->',
-		'  <div id="shortcuts" class="section active">',
-		'    <div class="add-form">',
-		'      <input id="sc-title" placeholder="Title (e.g. Toggle Terminal)" />',
-		'      <input id="sc-desc" placeholder="Keys or description" />',
-		'      <button class="btn" id="add-shortcut-btn">Add Shortcut</button>',
+		'  <!-- PROCESSES & SKILLS -->',
+		'  <div id="projects" class="section active">',
+		'    <div class="add-form" id="project-form">',
+		'      <input id="proj-name" placeholder="Process name (e.g. Next.js App)" />',
+		'      <input id="proj-desc" placeholder="Short description" />',
+		'      <div class="btn-row">',
+		'        <button class="btn" id="add-project-btn">Add Process</button>',
+		'        <button class="btn secondary" id="cancel-project-btn" style="display:none;">Cancel</button>',
+		'      </div>',
 		'    </div>',
-		'    <div id="shortcuts-list"></div>',
+		'    <div id="projects-list"></div>',
+		'  </div>',
+		'',
+		'  <!-- FILES -->',
+		'  <div id="files" class="section">',
+		'    <div class="add-form">',
+		'      <input id="file-name" placeholder="Display name (e.g. .env)" />',
+		'      <input id="file-filename" placeholder="Filename (e.g. .env)" />',
+		'      <textarea id="file-content" placeholder="File content..."></textarea>',
+		'      <div class="btn-row">',
+		'        <button class="btn" id="add-file-btn">Add File Template</button>',
+		'        <button class="btn secondary" id="cancel-file-btn" style="display:none;">Cancel</button>',
+		'      </div>',
+		'    </div>',
+		'    <div id="files-list"></div>',
 		'  </div>',
 		'',
 		'  <!-- NOTES -->',
@@ -572,31 +792,14 @@ function getWebviewContent(
 		'    <div id="notes-list"></div>',
 		'  </div>',
 		'',
-		'  <!-- FILES -->',
-		'  <div id="files" class="section">',
+		'  <!-- SHORTCUTS -->',
+		'  <div id="shortcuts" class="section">',
 		'    <div class="add-form">',
-		'      <input id="file-name" placeholder="Display name (e.g. .env)" />',
-		'      <input id="file-filename" placeholder="Filename (e.g. .env)" />',
-		'      <textarea id="file-content" placeholder="File content..."></textarea>',
-		'      <div class="btn-row">',
-		'        <button class="btn" id="add-file-btn">Add File Template</button>',
-		'        <button class="btn secondary" id="cancel-file-btn" style="display:none;">Cancel</button>',
-		'      </div>',
+		'      <input id="sc-title" placeholder="Title (e.g. Toggle Terminal)" />',
+		'      <input id="sc-desc" placeholder="Keys or description" />',
+		'      <button class="btn" id="add-shortcut-btn">Add Shortcut</button>',
 		'    </div>',
-		'    <div id="files-list"></div>',
-		'  </div>',
-		'',
-		'  <!-- PROCESSES & SKILLS -->',
-		'  <div id="projects" class="section">',
-		'    <div class="add-form" id="project-form">',
-		'      <input id="proj-name" placeholder="Process name (e.g. Next.js App)" />',
-		'      <input id="proj-desc" placeholder="Short description" />',
-		'      <div class="btn-row">',
-		'        <button class="btn" id="add-project-btn">Add Process</button>',
-		'        <button class="btn secondary" id="cancel-project-btn" style="display:none;">Cancel</button>',
-		'      </div>',
-		'    </div>',
-		'    <div id="projects-list"></div>',
+		'    <div id="shortcuts-list"></div>',
 		'  </div>',
 		'',
 		'  <script nonce="' + nonce + '" src="' + scriptUri + '"></script>',
