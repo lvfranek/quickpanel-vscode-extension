@@ -12,8 +12,30 @@ interface Note {
 	content: string;
 }
 
+interface FileTemplate {
+	id: string;
+	name: string;
+	filename: string;
+	content: string;
+}
+
+interface ProjectStep {
+	id: string;
+	label: string;
+	type: 'file' | 'command';
+	filename?: string;
+	content?: string;
+	command?: string;
+}
+
+interface ProjectType {
+	id: string;
+	name: string;
+	description: string;
+	steps: ProjectStep[];
+}
+
 export function activate(context: vscode.ExtensionContext) {
-	// Status bar button
 	const statusBarItem = vscode.window.createStatusBarItem(
 		vscode.StatusBarAlignment.Right,
 		100
@@ -30,39 +52,202 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.ViewColumn.Beside,
 			{
 				enableScripts: true,
-				retainContextWhenHidden: true
+				retainContextWhenHidden: true,
+				localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, 'media')]
 			}
 		);
+		panel.iconPath = new vscode.ThemeIcon("zap");
 
-		// Load saved data
 		const shortcuts: Shortcut[] = context.globalState.get("shortcuts", []);
 		const notes: Note[] = context.globalState.get("notes", []);
+		const files: FileTemplate[] = context.globalState.get("files", getDefaultFiles());
+		const projects: ProjectType[] = context.globalState.get("projects", getDefaultProjects());
 
-		panel.webview.html = getWebviewContent(shortcuts, notes);
+		panel.webview.html = getWebviewContent(
+			panel.webview,
+			context.extensionUri,
+			shortcuts,
+			notes,
+			files,
+			projects
+		);
 
-		// Handle messages from webview
 		panel.webview.onDidReceiveMessage(async (message) => {
 			switch (message.command) {
+				case "saveShortcuts":
+					await context.globalState.update("shortcuts", message.data);
+					break;
+				case "saveNotes":
+					await context.globalState.update("notes", message.data);
+					break;
+				case "saveFiles":
+					await context.globalState.update("files", message.data);
+					break;
+				case "saveProjects":
+					await context.globalState.update("projects", message.data);
+					break;
 				case "createFile":
 					await createFile(message.filename, message.content);
 					break;
-
-				case "runSkill":
-					await runInTerminal(message.commandText);
-					break;
-
-				case "saveShortcuts":
-					await context.globalState.update("shortcuts", message.shortcuts);
-					break;
-
-				case "saveNotes":
-					await context.globalState.update("notes", message.notes);
+				case "runProjectStep":
+					if (message.stepType === 'file') {
+						await createFile(message.filename, message.content);
+					} else {
+						await runInTerminal(message.commandText);
+					}
 					break;
 			}
 		});
 	});
 
 	context.subscriptions.push(statusBarItem, openCommand);
+}
+
+function getDefaultFiles(): FileTemplate[] {
+	return [
+		{ id: "1", name: ".env", filename: ".env", content: "NODE_ENV=development\n" },
+		{ id: "2", name: ".gitignore", filename: ".gitignore", content: "node_modules\n.env\n.DS_Store\ndist\n.next\n" },
+		{ id: "3", name: "Agents.md", filename: "Agents.md", content: "# Agents\n\n" },
+		{ id: "4", name: "README.md", filename: "README.md", content: "# Project\n\n" }
+	];
+}
+
+function getDefaultProjects(): ProjectType[] {
+	return [
+		{
+			id: "proj1",
+			name: "Next.js App",
+			description: "Full-stack Next.js with TypeScript, Tailwind & App Router",
+			steps: [
+				{
+					id: "p1s1",
+					label: "Create Next.js project",
+					type: "command",
+					command: "npx create-next-app@latest ./ --ts --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack"
+				},
+				{
+					id: "p1s2",
+					label: "Create .env file",
+					type: "file",
+					filename: ".env",
+					content: "NODE_ENV=development\n"
+				},
+				{
+					id: "p1s3",
+					label: "Create Agents.md",
+					type: "file",
+					filename: "Agents.md",
+					content: "# Agents\n\n"
+				}
+			]
+		},
+		{
+			id: "proj2",
+			name: "React (Vite)",
+			description: "React app with Vite and TypeScript",
+			steps: [
+				{
+					id: "p2s1",
+					label: "Create Vite React project",
+					type: "command",
+					command: "npm create vite@latest . -- --template react-ts"
+				},
+				{
+					id: "p2s2",
+					label: "Install dependencies",
+					type: "command",
+					command: "npm install"
+				},
+				{
+					id: "p2s3",
+					label: "Create .env file",
+					type: "file",
+					filename: ".env",
+					content: "VITE_APP_NAME=my-app\n"
+				}
+			]
+		},
+		{
+			id: "proj3",
+			name: "Simple HTML + CSS + JS",
+			description: "Bare-bones static site with three files",
+			steps: [
+				{
+					id: "p3s1",
+					label: "Create index.html",
+					type: "file",
+					filename: "index.html",
+					content: "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>My Project</title>\n  <link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n  <h1>Hello World</h1>\n  <script src=\"script.js\"><" + "/script>\n</body>\n</html>\n"
+				},
+				{
+					id: "p3s2",
+					label: "Create style.css",
+					type: "file",
+					filename: "style.css",
+					content: "* { box-sizing: border-box; margin: 0; padding: 0; }\nbody {\n  font-family: system-ui, sans-serif;\n  padding: 2rem;\n}\n"
+				},
+				{
+					id: "p3s3",
+					label: "Create script.js",
+					type: "file",
+					filename: "script.js",
+					content: "console.log('Hello World');\n"
+				}
+			]
+		},
+		{
+			id: "proj4",
+			name: "Angular",
+			description: "Angular app with routing and SCSS",
+			steps: [
+				{
+					id: "p4s1",
+					label: "Install Angular CLI",
+					type: "command",
+					command: "npm install -g @angular/cli"
+				},
+				{
+					id: "p4s2",
+					label: "Create Angular project",
+					type: "command",
+					command: "ng new . --routing --style scss --no-create-application"
+				},
+				{
+					id: "p4s3",
+					label: "Create .env file",
+					type: "file",
+					filename: ".env",
+					content: "NODE_ENV=development\n"
+				}
+			]
+		},
+		{
+			id: "proj5",
+			name: "Next.js / React Best Practices Skill",
+			description: "Install vercel-labs React agent skills",
+			steps: [
+				{
+					id: "p5s1",
+					label: "Install React Best Practices Skill",
+					type: "command",
+					command: "npx skills add vercel-labs/agent-skills/vercel-react-best-practices"
+				}
+			]
+		},
+		{
+			id: "proj6",
+			name: "All Vercel Agent Skills",
+			description: "Full collection of vercel-labs agent skills",
+			steps: [
+				{
+					id: "p6s1",
+					label: "Install All Vercel Skills",
+					type: "command",
+					command: "npx skills add vercel-labs/agent-skills"
+				}
+			]
+		}
+	];
 }
 
 async function createFile(filename: string, content: string) {
@@ -82,14 +267,13 @@ async function createFile(filename: string, content: string) {
 				"Yes",
 				"No"
 			);
-			if (choice !== "Yes") return;
+			if (choice !== "Yes") { return; }
 		} catch {
-			// doesn't exist
+			// file does not exist — proceed
 		}
 
 		await vscode.workspace.fs.writeFile(fileUri, Buffer.from(content, "utf8"));
 		vscode.window.showInformationMessage(`Created ${filename}`);
-
 		const doc = await vscode.workspace.openTextDocument(fileUri);
 		await vscode.window.showTextDocument(doc, { preview: false });
 	} catch {
@@ -98,303 +282,336 @@ async function createFile(filename: string, content: string) {
 }
 
 async function runInTerminal(command: string) {
-	const terminal = vscode.window.createTerminal("Quickpanel Skill");
+	const terminal = vscode.window.createTerminal("Quickpanel");
 	terminal.show();
 	terminal.sendText(command);
 }
 
-function getWebviewContent(shortcuts: Shortcut[], notes: Note[]) {
-	return /*html*/ `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: var(--vscode-font-family);
-      background: var(--vscode-editor-background);
-      color: var(--vscode-foreground);
-      padding: 14px;
-      font-size: 13px;
-    }
+function getWebviewContent(
+	webview: vscode.Webview,
+	extensionUri: vscode.Uri,
+	shortcuts: Shortcut[],
+	notes: Note[],
+	files: FileTemplate[],
+	projects: ProjectType[]
+): string {
+	// Encode ALL data as base64 so it can be embedded in an HTML attribute
+	// without any risk of breaking the HTML structure (no </script>, no quotes to escape).
+	const dataB64 = Buffer.from(
+		JSON.stringify({ shortcuts, notes, files, projects })
+	).toString('base64');
 
-    .tabs {
-      display: flex;
-      gap: 6px;
-      margin-bottom: 18px;
-      border-bottom: 1px solid var(--vscode-panel-border);
-      padding-bottom: 10px;
-    }
-    .tab {
-      padding: 6px 14px;
-      border: none;
-      border-radius: 6px;
-      background: transparent;
-      color: var(--vscode-foreground);
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .tab.active {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-    }
+	// Serve webview.js from the media folder
+	const scriptUri = webview.asWebviewUri(
+		vscode.Uri.joinPath(extensionUri, 'media', 'webview.js')
+	);
 
-    .section { display: none; }
-    .section.active { display: block; }
+	// Nonce for Content Security Policy
+	const nonce = getNonce();
 
-    .item {
-      background: var(--vscode-input-background);
-      border-radius: 8px;
-      padding: 10px 12px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 10px;
-    }
-    .item:hover { background: var(--vscode-list-hoverBackground); }
-    .item-content { flex: 1; cursor: pointer; }
-    .item-title { font-weight: 500; margin-bottom: 2px; }
-    .item-desc { opacity: 0.7; font-size: 12px; white-space: pre-wrap; }
+	return [
+		'<!DOCTYPE html>',
+		'<html lang="en">',
+		'<head>',
+		'  <meta charset="UTF-8">',
+		'  <meta http-equiv="Content-Security-Policy"',
+		'        content="default-src \'none\'; script-src ' + webview.cspSource + ' \'nonce-' + nonce + '\'; style-src \'unsafe-inline\';">',
+		'  <style>',
+		'    * { box-sizing: border-box; margin: 0; padding: 0; }',
+		'    body {',
+		'      font-family: var(--vscode-font-family);',
+		'      background: var(--vscode-editor-background);',
+		'      color: var(--vscode-foreground);',
+		'      padding: 14px;',
+		'      font-size: 13px;',
+		'    }',
+		'    .tabs {',
+		'      display: flex; gap: 4px; margin-bottom: 16px;',
+		'      background: var(--vscode-input-background); padding: 4px;',
+		'      border-radius: 8px; border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));',
+		'    }',
+		'    .tab {',
+		'      flex: 1; padding: 6px 8px; border: none; border-radius: 6px;',
+		'      background: transparent; color: var(--vscode-foreground);',
+		'      cursor: pointer; font-size: 12px; font-weight: 500; text-align: center;',
+		'      transition: all 0.15s ease; opacity: 0.7;',
+		'    }',
+		'    .tab:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }',
+		'    .tab.active {',
+		'      background: var(--vscode-button-background); color: var(--vscode-button-foreground);',
+		'      opacity: 1; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.2);',
+		'    }',
+		'    .section { display: none; }',
+		'    .section.active { display: block; }',
+		'    .item {',
+		'      background: var(--vscode-input-background); border-radius: 8px;',
+		'      padding: 10px 10px 10px 6px; margin-bottom: 8px;',
+		'      display: flex; align-items: flex-start; gap: 6px;',
+		'      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;',
+		'    }',
+		'    .item.dragging { opacity: 0.4; transform: scale(0.98); }',
+		'    .item.drag-over { box-shadow: 0 0 0 2px var(--vscode-focusBorder); }',
+		'    .file-row {',
+		'      background: var(--vscode-input-background); border-radius: 8px;',
+		'      padding: 10px 10px 10px 6px; margin-bottom: 8px;',
+		'      display: flex; align-items: center; gap: 6px;',
+		'      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;',
+		'    }',
+		'    .file-row.dragging { opacity: 0.4; transform: scale(0.98); }',
+		'    .file-row.drag-over { box-shadow: 0 0 0 2px var(--vscode-focusBorder); }',
+		'    .file-row .info { flex: 1; cursor: pointer; }',
+		'    .file-row strong { display: block; margin-bottom: 2px; font-size: 13px; }',
+		'    .file-row span { opacity: 0.65; font-size: 12px; }',
+		'    .drag-handle {',
+		'      cursor: grab; padding: 4px 2px; opacity: 0.45;',
+		'      font-size: 14px; line-height: 1; user-select: none;',
+		'      flex-shrink: 0; margin-top: 2px;',
+		'    }',
+		'    .drag-handle:active { cursor: grabbing; }',
+		'    .drag-handle:hover { opacity: 0.8; }',
+		'    .item-content { flex: 1; min-width: 0; }',
+		'    .item-title { font-weight: 500; margin-bottom: 3px; word-break: break-word; }',
+		'    .item-desc {',
+		'      opacity: 0.75; font-size: 12px; white-space: pre-wrap;',
+		'      word-break: break-word; max-height: 58px; overflow: hidden;',
+		'    }',
+		'    .item-desc.expanded { max-height: none; }',
+		'    .show-more {',
+		'      color: var(--vscode-textLink-foreground); cursor: pointer;',
+		'      font-size: 11px; margin-top: 4px; display: inline-block;',
+		'    }',
+		'    .actions { display: flex; gap: 2px; flex-shrink: 0; }',
+		'    .icon-btn {',
+		'      background: transparent; border: none; color: var(--vscode-foreground);',
+		'      cursor: pointer; font-size: 14px; padding: 3px 6px;',
+		'      opacity: 0.55; border-radius: 4px;',
+		'    }',
+		'    .icon-btn:hover { opacity: 1; background: var(--vscode-toolbar-hoverBackground); }',
+		'    .icon-btn.danger:hover { color: var(--vscode-errorForeground); }',
+		'    .add-form {',
+		'      display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px;',
+		'      background: var(--vscode-input-background); padding: 12px; border-radius: 8px;',
+		'    }',
+		'    input, textarea, select {',
+		'      background: var(--vscode-editor-background); color: var(--vscode-foreground);',
+		'      border: 1px solid var(--vscode-panel-border); border-radius: 6px;',
+		'      padding: 8px 10px; font-family: inherit; font-size: 13px; width: 100%;',
+		'    }',
+		'    textarea { min-height: 80px; resize: vertical; }',
+		'    .md-toolbar { display: flex; gap: 4px; flex-wrap: wrap; }',
+		'    .md-btn {',
+		'      background: var(--vscode-editor-background);',
+		'      border: 1px solid var(--vscode-panel-border);',
+		'      color: var(--vscode-foreground); border-radius: 4px;',
+		'      padding: 4px 8px; font-size: 12px; cursor: pointer;',
+		'    }',
+		'    .md-btn:hover { background: var(--vscode-list-hoverBackground); }',
+		'    .btn {',
+		'      background: var(--vscode-button-background);',
+		'      color: var(--vscode-button-foreground);',
+		'      border: none; border-radius: 6px; padding: 8px 14px;',
+		'      cursor: pointer; font-size: 13px; align-self: flex-start; white-space: nowrap;',
+		'    }',
+		'    .btn:hover { opacity: 0.88; }',
+		'    .btn.secondary {',
+		'      background: transparent; border: 1px solid var(--vscode-panel-border);',
+		'      color: var(--vscode-foreground);',
+		'    }',
+		'    .btn.small { padding: 4px 10px; font-size: 12px; }',
+		'    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }',
+		'    h3 {',
+		'      margin: 18px 0 10px; font-size: 11px; opacity: 0.6;',
+		'      text-transform: uppercase; letter-spacing: 0.5px;',
+		'    }',
+		'    h3:first-child { margin-top: 0; }',
+		'    .empty { opacity: 0.45; font-size: 12px; padding: 8px 0; }',
+		'    .md-bold { font-weight: 600; }',
+		'    .md-italic { font-style: italic; }',
+		'    .md-code {',
+		'      background: var(--vscode-textCodeBlock-background);',
+		'      padding: 1px 5px; border-radius: 3px;',
+		'      font-family: var(--vscode-editor-font-family); font-size: 12px;',
+		'    }',
+		'    /* Modal */',
+		'    .modal-backdrop {',
+		'      position: fixed; inset: 0; background: rgba(0,0,0,0.5);',
+		'      display: flex; align-items: center; justify-content: center; z-index: 9999;',
+		'    }',
+		'    .modal-backdrop.hidden { display: none; }',
+		'    .modal-box {',
+		'      background: var(--vscode-editor-background);',
+		'      border: 1px solid var(--vscode-panel-border);',
+		'      border-radius: 10px; padding: 20px 24px; max-width: 340px; width: 90%;',
+		'      box-shadow: 0 8px 32px rgba(0,0,0,0.4);',
+		'    }',
+		'    .modal-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; }',
+		'    .modal-body {',
+		'      font-size: 12px; opacity: 0.8; margin-bottom: 16px;',
+		'      line-height: 1.5; word-break: break-all; white-space: pre-wrap;',
+		'    }',
+		'    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }',
+		'    /* Processes */',
+		'    .project-card {',
+		'      background: var(--vscode-input-background); border-radius: 8px;',
+		'      margin-bottom: 8px; overflow: hidden;',
+		'      transition: box-shadow 0.15s ease, opacity 0.15s ease, transform 0.15s ease;',
+		'    }',
+		'    .project-card.dragging { opacity: 0.4; transform: scale(0.98); }',
+		'    .project-card.drag-over { box-shadow: 0 0 0 2px var(--vscode-focusBorder); }',
+		'    .project-header { display: flex; align-items: center; gap: 8px; padding: 10px; }',
+		'    .project-header-info { flex: 1; cursor: pointer; min-width: 0; }',
+		'    .project-name { font-weight: 600; font-size: 13px; margin-bottom: 2px; }',
+		'    .project-desc { opacity: 0.65; font-size: 11px; }',
+		'    .expand-btn {',
+		'      background: var(--vscode-editor-background); border: 1px solid var(--vscode-panel-border);',
+		'      color: var(--vscode-foreground); border-radius: 5px; padding: 3px 8px;',
+		'      font-size: 11px; font-weight: 500; cursor: pointer; display: flex; align-items: center;',
+		'      gap: 4px; flex-shrink: 0; margin-right: 4px; transition: all 0.15s ease;',
+		'    }',
+		'    .expand-btn:hover { background: var(--vscode-list-hoverBackground); border-color: var(--vscode-focusBorder); }',
+		'    .project-body { display: none; padding: 0 10px 10px 10px; border-top: 1px solid var(--vscode-panel-border); }',
+		'    .project-card.open .project-body { display: block; }',
+		'    .steps-list { margin: 10px 0 8px; }',
+		'    .step-item {',
+		'      display: flex; align-items: center; gap: 6px;',
+		'      background: var(--vscode-editor-background); border-radius: 6px;',
+		'      padding: 8px 8px 8px 4px; margin-bottom: 6px;',
+		'      transition: box-shadow 0.15s, opacity 0.15s, transform 0.15s;',
+		'    }',
+		'    .step-item.dragging { opacity: 0.4; transform: scale(0.98); }',
+		'    .step-item.drag-over { box-shadow: 0 0 0 2px var(--vscode-focusBorder); }',
+		'    .step-number {',
+		'      width: 20px; height: 20px; border-radius: 50%;',
+		'      background: var(--vscode-button-background); color: var(--vscode-button-foreground);',
+		'      font-size: 10px; font-weight: 700; display: flex; align-items: center;',
+		'      justify-content: center; flex-shrink: 0;',
+		'    }',
+		'    .step-info { flex: 1; min-width: 0; }',
+		'    .step-label { font-size: 12px; font-weight: 500; }',
+		'    .step-type-badge {',
+		'      display: inline-block; font-size: 10px; padding: 1px 5px;',
+		'      border-radius: 3px; margin-top: 2px; opacity: 0.75;',
+		'    }',
+		'    .step-type-badge.file { background: var(--vscode-editorInfo-foreground); color: #000; }',
+		'    .step-type-badge.command { background: var(--vscode-terminal-ansiGreen); color: #000; }',
+		'    .step-actions { display: flex; gap: 4px; flex-shrink: 0; }',
+		'    .run-all-row {',
+		'      display: flex; gap: 8px; align-items: center; margin-top: 6px;',
+		'      padding-top: 8px; border-top: 1px solid var(--vscode-panel-border);',
+		'    }',
+		'    .add-step-form {',
+		'      background: var(--vscode-editor-background);',
+		'      border: 1px solid var(--vscode-panel-border);',
+		'      border-radius: 6px; padding: 10px; margin-top: 8px;',
+		'      display: flex; flex-direction: column; gap: 6px;',
+		'    }',
+		'    .add-step-form.hidden { display: none; }',
+		'    .step-type-toggle { display: flex; gap: 6px; }',
+		'    .type-opt {',
+		'      flex: 1; padding: 5px 8px;',
+		'      border: 1px solid var(--vscode-panel-border);',
+		'      border-radius: 5px; background: transparent;',
+		'      color: var(--vscode-foreground); cursor: pointer; font-size: 12px; text-align: center;',
+		'    }',
+		'    .type-opt.selected {',
+		'      background: var(--vscode-button-background);',
+		'      color: var(--vscode-button-foreground);',
+		'      border-color: var(--vscode-button-background);',
+		'    }',
+		'  </style>',
+		'</head>',
+		'<body>',
+		'  <!-- Data carrier: base64-encoded JSON, safe in any attribute value -->',
+		'  <div id="initial-data" style="display:none" data-json="' + dataB64 + '"></div>',
+		'',
+		'  <!-- Confirm Modal -->',
+		'  <div class="modal-backdrop hidden" id="confirm-modal">',
+		'    <div class="modal-box">',
+		'      <div class="modal-title" id="modal-title">Confirm</div>',
+		'      <div class="modal-body" id="modal-body"></div>',
+		'      <div class="modal-actions">',
+		'        <button class="btn secondary small" id="modal-cancel">Cancel</button>',
+		'        <button class="btn small" id="modal-confirm">Yes, proceed</button>',
+		'      </div>',
+		'    </div>',
+		'  </div>',
+		'',
+		'  <div class="tabs">',
+		'    <button class="tab active" data-tab="shortcuts">Shortcuts</button>',
+		'    <button class="tab" data-tab="notes">Notes</button>',
+		'    <button class="tab" data-tab="files">Files</button>',
+		'    <button class="tab" data-tab="projects">Processes & Skills</button>',
+		'  </div>',
+		'',
+		'  <!-- SHORTCUTS -->',
+		'  <div id="shortcuts" class="section active">',
+		'    <div class="add-form">',
+		'      <input id="sc-title" placeholder="Title (e.g. Toggle Terminal)" />',
+		'      <input id="sc-desc" placeholder="Keys or description" />',
+		'      <button class="btn" id="add-shortcut-btn">Add Shortcut</button>',
+		'    </div>',
+		'    <div id="shortcuts-list"></div>',
+		'  </div>',
+		'',
+		'  <!-- NOTES -->',
+		'  <div id="notes" class="section">',
+		'    <div class="add-form">',
+		'      <input id="note-title" placeholder="Note title" />',
+		'      <div class="md-toolbar">',
+		'        <button class="md-btn" data-md="bold"><b>B</b></button>',
+		'        <button class="md-btn" data-md="italic"><i>I</i></button>',
+		'        <button class="md-btn" data-md="code">Code</button>',
+		'        <button class="md-btn" data-md="link">Link</button>',
+		'      </div>',
+		'      <textarea id="note-content" placeholder="Write your note..."></textarea>',
+		'      <div class="btn-row">',
+		'        <button class="btn" id="add-note-btn">Add Note</button>',
+		'        <button class="btn secondary" id="cancel-edit-btn" style="display:none;">Cancel</button>',
+		'      </div>',
+		'    </div>',
+		'    <div id="notes-list"></div>',
+		'  </div>',
+		'',
+		'  <!-- FILES -->',
+		'  <div id="files" class="section">',
+		'    <div class="add-form">',
+		'      <input id="file-name" placeholder="Display name (e.g. .env)" />',
+		'      <input id="file-filename" placeholder="Filename (e.g. .env)" />',
+		'      <textarea id="file-content" placeholder="File content..."></textarea>',
+		'      <div class="btn-row">',
+		'        <button class="btn" id="add-file-btn">Add File Template</button>',
+		'        <button class="btn secondary" id="cancel-file-btn" style="display:none;">Cancel</button>',
+		'      </div>',
+		'    </div>',
+		'    <div id="files-list"></div>',
+		'  </div>',
+		'',
+		'  <!-- PROCESSES & SKILLS -->',
+		'  <div id="projects" class="section">',
+		'    <div class="add-form" id="project-form">',
+		'      <input id="proj-name" placeholder="Process name (e.g. Next.js App)" />',
+		'      <input id="proj-desc" placeholder="Short description" />',
+		'      <div class="btn-row">',
+		'        <button class="btn" id="add-project-btn">Add Process</button>',
+		'        <button class="btn secondary" id="cancel-project-btn" style="display:none;">Cancel</button>',
+		'      </div>',
+		'    </div>',
+		'    <div id="projects-list"></div>',
+		'  </div>',
+		'',
+		'  <script nonce="' + nonce + '" src="' + scriptUri + '"></script>',
+		'</body>',
+		'</html>'
+	].join('\n');
+}
 
-    .delete-btn {
-      background: transparent;
-      border: none;
-      color: var(--vscode-errorForeground);
-      cursor: pointer;
-      font-size: 16px;
-      padding: 2px 6px;
-      opacity: 0.7;
-    }
-    .delete-btn:hover { opacity: 1; }
-
-    .add-form {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 16px;
-      background: var(--vscode-input-background);
-      padding: 12px;
-      border-radius: 8px;
-    }
-    input, textarea {
-      background: var(--vscode-editor-background);
-      color: var(--vscode-foreground);
-      border: 1px solid var(--vscode-panel-border);
-      border-radius: 6px;
-      padding: 8px 10px;
-      font-family: inherit;
-      font-size: 13px;
-      width: 100%;
-    }
-    textarea { min-height: 70px; resize: vertical; }
-
-    .btn {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      border: none;
-      border-radius: 6px;
-      padding: 8px 14px;
-      cursor: pointer;
-      font-size: 13px;
-      align-self: flex-start;
-    }
-    .btn:hover { opacity: 0.9; }
-
-    .file-btn {
-      background: var(--vscode-input-background);
-      border-radius: 8px;
-      padding: 11px 14px;
-      margin-bottom: 8px;
-      cursor: pointer;
-      transition: background 0.1s;
-    }
-    .file-btn:hover { background: var(--vscode-list-hoverBackground); }
-    .file-btn strong { display: block; margin-bottom: 2px; }
-    .file-btn span { opacity: 0.65; font-size: 12px; }
-
-    h3 { margin-bottom: 12px; font-size: 14px; opacity: 0.9; }
-    .empty { opacity: 0.5; font-size: 12px; padding: 8px 0; }
-  </style>
-</head>
-<body>
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('shortcuts')">Shortcuts</button>
-    <button class="tab" onclick="showTab('notes')">Notes</button>
-    <button class="tab" onclick="showTab('files')">Files & Skills</button>
-  </div>
-
-  <!-- SHORTCUTS -->
-  <div id="shortcuts" class="section active">
-    <div class="add-form">
-      <input id="sc-title" placeholder="Shortcut title (e.g. Toggle Terminal)" />
-      <input id="sc-desc" placeholder="Description or keys (e.g. Ctrl+\` )" />
-      <button class="btn" onclick="addShortcut()">Add Shortcut</button>
-    </div>
-    <div id="shortcuts-list"></div>
-  </div>
-
-  <!-- NOTES -->
-  <div id="notes" class="section">
-    <div class="add-form">
-      <input id="note-title" placeholder="Note title" />
-      <textarea id="note-content" placeholder="Write your note... (markdown works)"></textarea>
-      <button class="btn" onclick="addNote()">Add Note</button>
-    </div>
-    <div id="notes-list"></div>
-  </div>
-
-  <!-- FILES & SKILLS -->
-  <div id="files" class="section">
-    <h3>Create Files</h3>
-    <div class="file-btn" onclick="createFile('.env', 'NODE_ENV=development\\n')">
-      <strong>.env</strong>
-      <span>Basic environment file</span>
-    </div>
-    <div class="file-btn" onclick="createFile('.gitignore', 'node_modules\\n.env\\n.DS_Store\\ndist\\n.next\\n')">
-      <strong>.gitignore</strong>
-      <span>Common ignores</span>
-    </div>
-    <div class="file-btn" onclick="createFile('Agents.md', '# Agents\\n\\n')">
-      <strong>Agents.md</strong>
-      <span>Empty agents file</span>
-    </div>
-    <div class="file-btn" onclick="createFile('README.md', '# Project\\n\\n')">
-      <strong>README.md</strong>
-      <span>Basic readme</span>
-    </div>
-
-    <h3 style="margin-top: 24px;">AI Skills</h3>
-    <div class="file-btn" onclick="runSkill('npx skills add vercel-labs/agent-skills/vercel-react-best-practices')">
-      <strong>Next.js / React Best Practices</strong>
-      <span>vercel-labs/agent-skills</span>
-    </div>
-    <div class="file-btn" onclick="runSkill('npx skills add vercel-labs/agent-skills')">
-      <strong>All Vercel Agent Skills</strong>
-      <span>Full collection</span>
-    </div>
-  </div>
-
-  <script>
-    const vscode = acquireVsCodeApi();
-
-    let shortcuts = ${JSON.stringify(shortcuts)};
-    let notes = ${JSON.stringify(notes)};
-
-    function showTab(id) {
-      document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
-      event.target.classList.add('active');
-    }
-
-    function uid() {
-      return Date.now().toString(36) + Math.random().toString(36).slice(2);
-    }
-
-    // ===== SHORTCUTS =====
-    function renderShortcuts() {
-      const list = document.getElementById('shortcuts-list');
-      if (shortcuts.length === 0) {
-        list.innerHTML = '<div class="empty">No shortcuts yet</div>';
-        return;
-      }
-      list.innerHTML = shortcuts.map(s => \`
-        <div class="item">
-          <div class="item-content">
-            <div class="item-title">\${escapeHtml(s.title)}</div>
-            <div class="item-desc">\${escapeHtml(s.description)}</div>
-          </div>
-          <button class="delete-btn" onclick="deleteShortcut('\${s.id}')">×</button>
-        </div>
-      \`).join('');
-    }
-
-    function addShortcut() {
-      const title = document.getElementById('sc-title').value.trim();
-      const description = document.getElementById('sc-desc').value.trim();
-      if (!title) return;
-
-      shortcuts.unshift({ id: uid(), title, description });
-      document.getElementById('sc-title').value = '';
-      document.getElementById('sc-desc').value = '';
-      renderShortcuts();
-      saveShortcuts();
-    }
-
-    function deleteShortcut(id) {
-      shortcuts = shortcuts.filter(s => s.id !== id);
-      renderShortcuts();
-      saveShortcuts();
-    }
-
-    function saveShortcuts() {
-      vscode.postMessage({ command: 'saveShortcuts', shortcuts });
-    }
-
-    // ===== NOTES =====
-    function renderNotes() {
-      const list = document.getElementById('notes-list');
-      if (notes.length === 0) {
-        list.innerHTML = '<div class="empty">No notes yet</div>';
-        return;
-      }
-      list.innerHTML = notes.map(n => \`
-        <div class="item">
-          <div class="item-content">
-            <div class="item-title">\${escapeHtml(n.title)}</div>
-            <div class="item-desc">\${escapeHtml(n.content)}</div>
-          </div>
-          <button class="delete-btn" onclick="deleteNote('\${n.id}')">×</button>
-        </div>
-      \`).join('');
-    }
-
-    function addNote() {
-      const title = document.getElementById('note-title').value.trim();
-      const content = document.getElementById('note-content').value.trim();
-      if (!title && !content) return;
-
-      notes.unshift({ id: uid(), title: title || 'Untitled', content });
-      document.getElementById('note-title').value = '';
-      document.getElementById('note-content').value = '';
-      renderNotes();
-      saveNotes();
-    }
-
-    function deleteNote(id) {
-      notes = notes.filter(n => n.id !== id);
-      renderNotes();
-      saveNotes();
-    }
-
-    function saveNotes() {
-      vscode.postMessage({ command: 'saveNotes', notes });
-    }
-
-    // ===== FILES & SKILLS =====
-    function createFile(filename, content) {
-      vscode.postMessage({ command: 'createFile', filename, content });
-    }
-
-    function runSkill(commandText) {
-      vscode.postMessage({ command: 'runSkill', commandText });
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // Initial render
-    renderShortcuts();
-    renderNotes();
-  </script>
-</body>
-</html>
-  `;
+function getNonce(): string {
+	let text = '';
+	const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+	for (let i = 0; i < 32; i++) {
+		text += possible.charAt(Math.floor(Math.random() * possible.length));
+	}
+	return text;
 }
 
 export function deactivate() { }
