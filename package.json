@@ -8,7 +8,7 @@
   },
   "license": "MIT",
   "description": "One-click terminal commands, multi-step processes, and file templates",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "engines": {
     "vscode": "^1.125.0"
   },
