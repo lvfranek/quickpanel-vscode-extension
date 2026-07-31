@@ -3,6 +3,8 @@
 out/**
 node_modules/**
 src/**
+webview-src/**
+scripts/**
 .gitignore
 .yarnrc
 esbuild.js
@@ -12,3 +14,7 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+**/*.md
+!README.md
+!CHANGELOG.md
+!LICENSE

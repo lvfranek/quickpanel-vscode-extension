@@ -1,0 +1,52 @@
+  <!-- Data carrier: base64-encoded JSON, safe in any attribute value -->
+  <div id="initial-data" style="display:none" data-json="{{DATA_B64}}"></div>
+
+  <!-- Confirm Modal -->
+  <div class="modal-backdrop hidden" id="confirm-modal">
+    <div class="modal-box">
+      <div class="modal-title" id="modal-title">Confirm</div>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-actions">
+        <button class="btn secondary small" id="modal-cancel">Cancel</button>
+        <button class="btn small" id="modal-confirm">Yes, proceed</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INFO (opened from Favorites header) -->
+  <div id="info" class="section">
+    <div class="section-scroll">
+      <div class="info-top">
+        <button type="button" class="btn secondary small" data-back-home>← Back</button>
+      </div>
+      <div class="info-card">
+        <h3>What is this?</h3>
+        <p>Quickpanel is your command center for terminal commands, multi-step processes, and file templates.</p>
+      </div>
+      <div class="info-card">
+        <h3>Favorites</h3>
+        <p>Star any terminal command, process, or file with <strong>☆</strong>. Favorites appear as one-click run buttons at the top. Unstar to remove them. Favorites are not edited in place — edit them in their category.</p>
+      </div>
+      <div class="info-card">
+        <h3>Single-line terminal commands</h3>
+        <p>Single-line shell commands (e.g. <code>npm run dev</code> or <code>npx skills add …</code>). Run with one click — no confirm.</p>
+      </div>
+      <div class="info-card">
+        <h3>Multi-step processes</h3>
+        <p>Multi-step workflows: terminal commands and file creates, in order. Expand steps to edit. Only <strong>Run</strong> on the whole process asks for confirm.</p>
+      </div>
+      <div class="info-card">
+        <h3>File creation</h3>
+        <p>File templates. Run creates that file in your workspace folder immediately.</p>
+      </div>
+      <div class="info-card">
+        <h3>Drag &amp; drop</h3>
+        <p>Use the handle on the right to reorder items within a category.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOME: favorites + 3 categories -->
+  <div id="home" class="section active">
+    <div class="home-scroll" id="home-root"></div>
+  </div>

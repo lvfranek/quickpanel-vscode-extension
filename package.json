@@ -7,7 +7,7 @@
     "url": "https://github.com/lvfranek/quickpanel-vscode-extension"
   },
   "license": "MIT",
-  "description": "Quick access panel for shortcuts, notes and file templates",
+  "description": "One-click terminal commands, multi-step processes, and file templates",
   "version": "0.0.4",
   "engines": {
     "vscode": "^1.125.0"

@@ -1,84 +1,63 @@
-# ⚡ Quickpanel
+# Quickpanel
 
 ![Quickpanel demo](media/quickpanel-gif-1.gif)
 
-**Your personal command center inside VS Code.**
+Stop retyping the same terminal commands. Stop hunting for that one scaffold script. Quickpanel is a small panel in VS Code for stuff you run all the time.
 
-Quickpanel gives you instant access to multi-step processes, file templates, notes and shortcuts — without ever leaving your editor.
+**Favorites** at the top. Three lists below: single-line commands, multi-step processes, file templates. Star what you need → one click from the top.
 
----
+## Why
 
-![Quickpanel screenshot 1](media/screenshot-1.png)
+Because opening a terminal and typing `npm run dev` for the 40th time this week is boring. Same for spinning up a React app or dropping in a `.gitignore`.
 
-![Quickpanel screenshot 2](media/screenshot-2.png)
+You define it once. You run it from the panel.
 
-### ✨ Features
+## Install
 
-- **4 Modern Tabs**
-  - ⚙️ **Processes & Skills** – Run multi-step workflows (commands + file creation)
-  - 📄 **Files** – Create files from templates with one click
-  - 📝 **Notes** – Write and keep rich markdown notes right inside VS Code
-  - ⌨️ **Shortcuts** – Save and quickly access your most used keybindings & commands
+1. Install **Quickpanel** from the Extensions view (`Cmd+Shift+X` / `Ctrl+Shift+X`)
+2. Or from the [Marketplace](https://marketplace.visualstudio.com/) (search *Quickpanel*)
 
-- Full **drag & drop** reordering of items and process steps
-- Custom confirm dialogs
-- Everything is **persisted** across VS Code sessions
-- Clean and modern UI with a pill-segmented tab control
+Requires VS Code **1.125+**.
 
----
+## Use it
 
-### 🚀 How to use
+Click **⚡ Quickpanel** in the status bar (bottom right), or run **Open Quickpanel** from the Command Palette.
 
-1. Click the **⚡ Quickpanel** status bar item (bottom right)
-2. Or run the command: `Quickpanel: Open`
-3. Start adding your own processes, file templates, notes or shortcuts
+| Section | What it’s for |
+|--------|----------------|
+| **Favorites** | Starred items — run only, no editing clutter |
+| **Single-line terminal commands** | e.g. `npm run dev`, `npx skills add …` |
+| **Multi-step processes** | Ordered steps (commands + file creates) |
+| **File creation** | Templates like `README.md`, `.env`, … |
 
----
+- **▶ Run** on a card or favorite → goes
+- **☆** → pin to Favorites (unstar to remove)
+- **+ Add** in each section → new command / process / file
+- Edit opens **inline** under the item (steps too)
+- Drag the handle on the **right** to reorder
 
-### 📦 Pre-loaded Defaults
+Confirms only when you run a **whole multi-step process**. Single commands, single steps, and file creates just run.
 
-On first install you get useful starter content:
+## Comes with (fresh install)
 
-- Popular processes:
-  - Create Next.js App
-  - Create React (Vite) App
-  - Create Simple HTML + CSS + JS
-  - Create Angular App
-  - Add Tailwind CSS
-  - Create Clean Empty Project
-- Agent Skills:
-  - Add React/Next.js Best Practices Skill
-  - Add Supabase Postgres Best Practices Skill
-- Ready-to-use file templates (`.env`, `.gitignore`, `AGENTS.md`, `README.md`)
-- One example shortcut (Format Document)
+- Terminal: `npm run dev` (favorited), install React best-practices skill
+- Process: Create React App (Vite + install + `.env`)
+- Files: `README.md`, `AGENTS.md`, `.gitignore`, `.env`
 
-### AGENTS.md vs Skills
+Add your own. Delete what you don’t want. Everything is saved in VS Code.
 
-These are **two different** agent-context systems:
+## Develop
 
-| | **AGENTS.md** (repo root) | **Skills** (`.agents/skills/…`) |
-|--|--|--|
-| Created by | Quickpanel file steps / templates | `npx skills add …` |
-| Main file | One project-wide rules doc | Per-skill `SKILL.md` |
-| Used by agents | Always (passive rules) | On demand when relevant |
+```bash
+npm install
+npm run watch   # extension + webview
+# F5 → Extension Development Host
+```
 
-Installing a skill does **not** create or replace root `AGENTS.md`, and adding a second skill should not remove the first — skills live under `.agents/skills/<name>/`.
+```bash
+npm run package # production build
+```
 
-Each command step (and each Run All) opens a **new** VS Code terminal so previous output stays visible.
+## Issues
 
----
-
-### 🛠️ Requirements
-
-- Visual Studio Code `1.85.0` or higher
-
----
-
-### 📝 Feedback & Issues
-
-Found a bug or have a feature request?  
-Open an issue on [GitHub](https://github.com/lvfranek/quickpanel-vscode-extension).
-
----
-
-**Enjoy a faster workflow.** ⚡
+Bugs and ideas: [GitHub issues](https://github.com/lvfranek/quickpanel-vscode-extension/issues).
