@@ -1,5 +1,5 @@
 # ⚡ Quickpanel
-![Quickpanel demo](media/quickpanel-gif-1.gif)
+![Quickpanel demo](media/quickpanel.jpeg)
 
 ### Run terminal commands and create files twice as fast ⚡
 
