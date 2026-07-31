@@ -1,63 +1,73 @@
-# Quickpanel
+# ⚡ Quickpanel
 
 ![Quickpanel demo](media/quickpanel-gif-1.gif)
 
-Stop retyping the same terminal commands. Stop hunting for that one scaffold script. Quickpanel is a small panel in VS Code for stuff you run all the time.
+**Your personal command center inside VS Code.**
 
-**Favorites** at the top. Three lists below: single-line commands, multi-step processes, file templates. Star what you need → one click from the top.
+One-click favorites, single-line terminal commands, multi-step processes, and file templates — without leaving the editor.
 
-## Why
+---
 
-Because opening a terminal and typing `npm run dev` for the 40th time this week is boring. Same for spinning up a React app or dropping in a `.gitignore`.
+### ✨ Features
 
-You define it once. You run it from the panel.
+- **Favorites** — star any terminal command, process, or file for one-click run buttons at the top
+- **Terminal commands** — single-line shell commands (including AI skill installs)
+- **Processes** — multi-step workflows (commands + file creates, in order)
+- **Files** — create files from templates
+- Inline edit under each item and step
+- Drag & drop reordering (handle on the right)
+- Data persisted across VS Code sessions
 
-## Install
+---
 
-1. Install **Quickpanel** from the Extensions view (`Cmd+Shift+X` / `Ctrl+Shift+X`)
-2. Or from the [Marketplace](https://marketplace.visualstudio.com/) (search *Quickpanel*)
+### 🚀 How to use
 
-Requires VS Code **1.125+**.
+1. Click **⚡ Quickpanel** in the status bar (bottom right), or run **Open Quickpanel** from the Command Palette
+2. Use **+ Add** in Terminal commands / Processes / Files
+3. Star items with **☆** so they appear under **Favorites**
+4. Run from the favorite chip or the **▶ Run** button on any card
 
-## Use it
+---
 
-Click **⚡ Quickpanel** in the status bar (bottom right), or run **Open Quickpanel** from the Command Palette.
-
-| Section | What it’s for |
-|--------|----------------|
-| **Favorites** | Starred items — run only, no editing clutter |
-| **Single-line terminal commands** | e.g. `npm run dev`, `npx skills add …` |
-| **Multi-step processes** | Ordered steps (commands + file creates) |
-| **File creation** | Templates like `README.md`, `.env`, … |
-
-- **▶ Run** on a card or favorite → goes
-- **☆** → pin to Favorites (unstar to remove)
-- **+ Add** in each section → new command / process / file
-- Edit opens **inline** under the item (steps too)
-- Drag the handle on the **right** to reorder
-
-Confirms only when you run a **whole multi-step process**. Single commands, single steps, and file creates just run.
-
-## Comes with (fresh install)
+### 📦 Pre-loaded defaults (fresh install)
 
 - Terminal: `npm run dev` (favorited), install React best-practices skill
 - Process: Create React App (Vite + install + `.env`)
 - Files: `README.md`, `AGENTS.md`, `.gitignore`, `.env`
 
-Add your own. Delete what you don’t want. Everything is saved in VS Code.
+---
 
-## Develop
+### 🛠️ Requirements
 
-```bash
-npm install
-npm run watch   # extension + webview
-# F5 → Extension Development Host
+- Visual Studio Code `1.125.0` or higher
+
+---
+
+### 🧩 Project structure
+
+```
+src/                     # Extension host
+  extension.ts
+  models.ts
+  defaults.ts
+  files.ts / terminal.ts / runner.ts
+  webview/panel.ts, html.ts, template.html
+
+webview-src/             # Webview UI modules → media/webview.js
+  main.js, state.js, util.js, confirm.js, dnd.js, tabs.js
+  tabs/home.js
+
+media/                   # Shipped assets
+  webview.js, webview.css, template.html, icon.png
 ```
 
 ```bash
-npm run package # production build
+npm run watch    # host + webview
+npm run package  # production build
 ```
 
-## Issues
+---
 
-Bugs and ideas: [GitHub issues](https://github.com/lvfranek/quickpanel-vscode-extension/issues).
+### 📝 Feedback & Issues
+
+Open an issue on [GitHub](https://github.com/lvfranek/quickpanel-vscode-extension).
